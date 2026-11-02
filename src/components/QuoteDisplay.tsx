@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import confetti from "canvas-confetti";
 import {
   Sun,
   IndianRupee,
@@ -22,6 +23,7 @@ import {
 import { Lead, SubsidyRule } from "@/types/solar";
 import { calculateSolarQuote, DEFAULT_SUBSIDY_RULE } from "@/lib/solar-calculator";
 import { formatCurrency } from "@/lib/utils";
+import { AnimatedEnergyFlow } from "./AnimatedEnergyFlow";
 
 interface QuoteDisplayProps {
   lead: Lead;
@@ -31,6 +33,20 @@ interface QuoteDisplayProps {
 export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: QuoteDisplayProps) {
   const [selectedKw, setSelectedKw] = useState<number>(lead.recommendedKw || 3);
   const [copied, setCopied] = useState(false);
+
+  // Trigger celebration confetti on quote generation
+  useEffect(() => {
+    try {
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.6 },
+        colors: ["#f59e0b", "#10b981", "#3b82f6", "#ffffff"],
+      });
+    } catch (e) {
+      // Graceful fallback if in environment without canvas
+    }
+  }, []);
 
   const currentQuote = calculateSolarQuote(selectedKw, initialRule);
 
@@ -269,6 +285,9 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
           </div>
         </div>
       </div>
+
+      {/* LIVE ANIMATED SOLAR ENERGY FLOW SIMULATOR */}
+      <AnimatedEnergyFlow systemSizeKw={selectedKw} />
 
       {/* 25-YEAR INVESTMENT TIMELINE & BREAKEVEN CHART */}
       <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs space-y-6">
