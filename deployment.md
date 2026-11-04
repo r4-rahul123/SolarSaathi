@@ -48,21 +48,18 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ---
 
-## 2. Reviewer Demo Login & Credentials
+## 2. Reviewer Demo Login Credentials (RBAC)
 
-The application supports dual-persona flows:
-1. **Homeowner Public Persona (Mobile Web)**:
-   - **Access**: Open homepage directly at `http://localhost:3000`. No password or account setup required.
-   - **Quick Demo Feature**: Use the pre-seeded buttons on the form:
-     - `Sample High (Owner)`: Prashant Wankhede (Eligible for ₹78,000 subsidy & priority survey).
-     - `Sample Tenant`: Rohit Meshram (Auto-diverted to phone advisory, saving ₹2,500 survey waste).
-     - `Sample Small Bill`: Ayesha Siddiqui (₹650 bill, auto-diverted to phone advisory).
-   - **Customer Magic Link Tracking**: Visit `/track/LD-30881` or click the tracker link after submitting.
+The application features full **Role-Based Access Control (RBAC)**. You can either use the **⚡ 1-Click Quick Demo Login** buttons inside the app navbar, or log in with the following demo credentials:
 
-2. **Staff / Operations CRM Persona**:
-   - **Portal URL**: `http://localhost:3000/admin`
-   - **Role**: Sales Consultant / Lead Desk / Operations Manager
-   - **Access Mode**: Direct Staff Desk access with one-click status transitions and dated rule modifications.
+| Role | Demo Email | Password | Access & Responsibilities |
+| :--- | :--- | :--- | :--- |
+| **🏠 Homeowner** | `prashant@vidarbhasolar.in` | `user123` | Mobile-first intake, MSEDCL bill upload, instant subsidy calculation, and public magic tracking link (`/track/LD-30881`). |
+| **📞 Sales Desk** | `sales@vidarbhasolar.in` | `sales123` | Leads management queue, AI Score filtering (High vs Low), and short-call diverts for tenants/₹600 bills (saving ₹2,500/survey). |
+| **🛠️ Site Surveyor** | `surveyor@vidarbhasolar.in` | `survey123` | Scheduled rooftop site visits, shadow-free area checks, and structural feasibility approvals. |
+| **📋 Project Coordinator (Admin)** | `admin@vidarbhasolar.in` | `admin123` | Full access: DISCOM (MSEDCL) net-metering applications, milestone updates, and **Dated Subsidy Rule Master Editor**. |
+
+*(Tip: In the navbar, click on your profile name to open the role-switcher and switch perspectives with 1 click without re-typing passwords).*
 
 ---
 
@@ -74,7 +71,7 @@ The application is built on **Next.js 16 App Router** and deploys to **Vercel** 
 1. Push this repository to your public GitHub account:
    ```bash
    git add .
-   git commit -m "feat: complete rooftop solar platform with AI bill OCR and dated subsidy rules"
+   git commit -m "feat: complete rooftop solar platform with RBAC authentication and dated subsidy rules"
    git branch -M main
    git remote add origin <YOUR_GITHUB_REPO_URL>
    git push -u origin main

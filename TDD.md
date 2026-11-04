@@ -91,6 +91,24 @@ interface Lead {
 }
 ```
 
+### Entity 2: `User` & Role-Based Access Control (RBAC)
+Supports the 4 distinct operational roles across the rooftop solar lifecycle:
+```typescript
+type UserRole = "HOMEOWNER" | "SALES" | "SURVEYOR" | "COORDINATOR";
+
+interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  phone?: string;
+}
+```
+* **Homeowner**: Consumer submitting bill and tracking project.
+* **Sales Desk**: Qualifies leads based on AI scores, saves ₹2,500 on unqualified surveys.
+* **Site Surveyor**: Reviews structural viability and marks surveys complete.
+* **Project Coordinator (Admin)**: Submits DISCOM net-metering applications and manages dated subsidy rule tables.
+
 ### Entity 2: `SubsidyRule` (With Effective Dates)
 Explicitly satisfies the requirement for dated administrative rules.
 ```typescript
