@@ -83,8 +83,8 @@ export default function AdminDashboardPage() {
         setRuleName(r.name);
         setEffectiveFrom(r.effectiveFrom);
         setEffectiveTo(r.effectiveTo || "2027-03-31");
-        setTier1Rate(r.rates[0]?.ratePerKw || 30000);
-        setTier2Rate(r.rates[1]?.ratePerKw || 18000);
+        setTier1Rate(r.tier1RatePerKw ?? 30000);
+        setTier2Rate(r.tier2RatePerKw ?? 18000);
         setMaxCap(r.maxSubsidyCap);
         setGenerationBenchmark(r.generationPerKwPerYear);
       }
@@ -138,10 +138,8 @@ export default function AdminDashboardPage() {
           effectiveTo,
           maxSubsidyCap: Number(maxCap),
           generationPerKwPerYear: Number(generationBenchmark),
-          rates: [
-            { minKw: 0, maxKw: 2, ratePerKw: Number(tier1Rate) },
-            { minKw: 2, maxKw: 3, ratePerKw: Number(tier2Rate) },
-          ],
+          tier1RatePerKw: Number(tier1Rate),
+          tier2RatePerKw: Number(tier2Rate),
         }),
       });
       const data = await res.json();
