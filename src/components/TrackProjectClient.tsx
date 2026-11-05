@@ -45,7 +45,7 @@ const ORDERED_STAGES: ProjectStage[] = [
 export function TrackProjectClient({ initialLead, allLeads }: TrackProjectClientProps) {
   const [lead, setLead] = useState<Lead>(initialLead);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [activeTab, setActiveTab] = useState<"timeline" | "notifications">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline" | "notifications" | "photos">("timeline");
 
   // Mask consumer number for DPDP compliance (e.g. 4100****3741)
   const rawConsumer = lead.billExtraction?.consumerNumber || "410019283741";
@@ -256,17 +256,28 @@ export function TrackProjectClient({ initialLead, allLeads }: TrackProjectClient
             <button
               type="button"
               onClick={() => setActiveTab("notifications")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === "notifications"
                   ? "bg-[#123D2B] text-white shadow-xs"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>WhatsApp & SMS Stream</span>
+              <span>SMS Stream</span>
               <span className="text-[10px] bg-[#198754] text-white px-1.5 py-0.2 rounded-full">
                 {lead.notifications?.length || 1}
               </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("photos")}
+              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === "photos"
+                  ? "bg-[#123D2B] text-white shadow-xs"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+              }`}
+            >
+              <span>Site Photos</span>
             </button>
           </div>
 
@@ -355,7 +366,58 @@ export function TrackProjectClient({ initialLead, allLeads }: TrackProjectClient
           </div>
         )}
 
-        {/* TAB 2: MOCK WHATSAPP & SMS NOTIFICATION HISTORY */}
+        {/* TAB 3: SITE PHOTOS */}
+        {activeTab === "photos" && (
+          <div className="space-y-6 pt-2">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+              Verified photographic record captured by certified Nagpur solar engineers during physical inspection and panel mounting.
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                <div className="relative h-56">
+                  <img
+                    src="/images/hero-solar-rooftop.jpg"
+                    alt="Completed Rooftop Array"
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-[#123D2B] text-white">
+                    Installed Rooftop Array
+                  </span>
+                </div>
+                <div className="p-4 space-y-1">
+                  <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white">
+                    On-Grid Rooftop Array Mount
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Elevated GI structure on flat RCC terrace. 100% shadow-free South-facing tilt.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                <div className="relative h-56">
+                  <img
+                    src="/images/site-surveyor.jpg"
+                    alt="Engineer Site Survey"
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-[#198754] text-white">
+                    Engineer Site Inspection
+                  </span>
+                </div>
+                <div className="p-4 space-y-1">
+                  <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white">
+                    Shadow & Structural Analysis
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Feeder synchronization and inverter wiring inspection verified with MSEDCL.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {activeTab === "notifications" && (
           <div className="space-y-4 pt-2">
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
