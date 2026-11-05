@@ -1,8 +1,9 @@
 # Deployment & Setup Guide
 
-**Project**: Vidarbha Solar Hub (Rooftop Solar Qualification & Instant Subsidy Platform)  
-**Location / Target**: Nagpur & Vidarbha Region, Maharashtra  
-**Client Problem Solved**: Problem Statement 2 (Rooftop Solar Lead Qualification & Subsidy Quoting)
+**Project**: SolarSaathi (AI-Powered Rooftop Solar Sales & Project Management Platform)  
+**Location / Target**: Nagpur & Vidarbha Region, Maharashtra (BU-41, MSEDCL Urban & Rural Circles)  
+**Problem Statement**: Problem 2 (Rooftop Solar Lead Qualification, Sizing, Pricing & Project Tracker)  
+**Submission Due**: Nov 9, 2026, 11:59 pm IST  
 
 ---
 
@@ -28,14 +29,14 @@ npm install
 Create a file named `.env.local` in the project root:
 ```env
 # Optional: Google Gemini API Key for Live Multimodal Bill OCR
-# If omitted or left empty, the application automatically runs on a high-fidelity
-# built-in MSEDCL heuristic parser so you can test seamlessly without an API key!
+# If omitted or left empty, SolarSaathi automatically operates with a high-fidelity
+# built-in MSEDCL parser with confidence scores so evaluators can test instantly!
 GEMINI_API_KEY=
 ```
-*(Note: As per security guidelines, never commit actual secrets or API key values to GitHub).*
+*(Security Note: As per assignment guidelines, no real API keys or credentials are committed into this repository).*
 
 ### Step 4: Run Automated Tests
-Verify all core subsidy formulas, sizing logic, and lead scoring engine:
+Verify all core central subsidy formulas, 1,400 units/kW benchmark sizing, payback, and 100-point transparent lead scoring:
 ```bash
 npm test
 ```
@@ -50,28 +51,54 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ## 2. Reviewer Demo Login Credentials (RBAC)
 
-The application features full **Role-Based Access Control (RBAC)**. You can either use the **⚡ 1-Click Quick Demo Login** buttons inside the app navbar, or log in with the following demo credentials:
+The application features full **Role-Based Access Control (RBAC)** across 4 roles. You can either click any of the **⚡ 1-Click Quick Demo Login** buttons inside the app navbar or modal, or log in with the following demo credentials:
 
 | Role | Demo Email | Password | Access & Responsibilities |
 | :--- | :--- | :--- | :--- |
-| **🏠 Homeowner** | `prashant@vidarbhasolar.in` | `user123` | Mobile-first intake, MSEDCL bill upload, instant subsidy calculation, and public magic tracking link (`/track/LD-30881`). |
-| **📞 Sales Desk** | `sales@vidarbhasolar.in` | `sales123` | Leads management queue, AI Score filtering (High vs Low), and short-call diverts for tenants/₹600 bills (saving ₹2,500/survey). |
-| **🛠️ Site Surveyor** | `surveyor@vidarbhasolar.in` | `survey123` | Scheduled rooftop site visits, shadow-free area checks, and structural feasibility approvals. |
-| **📋 Project Coordinator (Admin)** | `admin@vidarbhasolar.in` | `admin123` | Full access: DISCOM (MSEDCL) net-metering applications, milestone updates, and **Dated Subsidy Rule Master Editor**. |
+| **🏠 Homeowner** | `customer@solarsaathi.demo` | `solar123` | Mobile-first intake, MSEDCL bill upload, side-by-side verification, instant subsidy calculation, 100-point transparent score, and public magic tracking link (`/track/LD-30881`). |
+| **📞 Sales Desk** | `sales@solarsaathi.demo` | `sales123` | Leads management queue, AI score filtering (High vs Low), and short-call diverts for tenants/small bills (saving ₹2,500/survey). |
+| **🛠️ Site Surveyor** | `surveyor@solarsaathi.demo` | `survey123` | Scheduled rooftop site visits, shadow-free area checks, and structural feasibility approvals. |
+| **📋 Project Coordinator (Admin)** | `admin@solarsaathi.demo` | `admin123` | Full access: Stuck projects alert (>7 days), DISCOM net-metering status, milestone progression, and **Dated Subsidy Rule & Base Installation Pricing Master Editor**. |
 
 *(Tip: In the navbar, click on your profile name to open the role-switcher and switch perspectives with 1 click without re-typing passwords).*
 
 ---
 
-## 3. Production Deployment (Vercel)
+## 3. Pre-Seeded Evaluation Scenarios
 
-The application is built on **Next.js 16 App Router** and deploys to **Vercel** with zero configuration.
+For rapid 2-minute evaluation, pre-seeded leads and projects are included in memory:
+
+1. **Prashant Wankhede (`LD-30881`)**:
+   - High Priority Owner: 340 units/month, 650 sq. ft. flat concrete roof.
+   - Recommended 3 kW plant, ₹78,000 Central PM Subsidy, 100/100 score.
+   - Public Tracker: `/track/LD-30881`.
+2. **Rohit Meshram (`LD-30902`)**:
+   - Tenant / Rental Lead: Flagged for Landlord NOC consultation.
+   - Saves ₹2,500 wasted site survey cost by routing to a 5-minute phone call.
+   - Public Tracker: `/track/LD-30902`.
+3. **Ayesha Siddiqui (`LD-30915`)**:
+   - Small Bill Lead: <₹800/mo (85 units). Payback >7 years.
+   - Diverted to Tele-Advisory desk to save survey costs.
+   - Public Tracker: `/track/LD-30915`.
+4. **Dr. Rajesh Deshmukh (`PR-1025`)**:
+   - **Stuck Project Alert**: Delayed 10 days at MSEDCL net-metering stage (>7 days threshold).
+   - Flagged in Staff CRM Stuck Projects tab with 1-click resolve.
+   - Public Tracker: `/track/PR-1025`.
+5. **Sunita Patil (`PR-1026`)**:
+   - **Stuck Project Alert**: Delayed 15 days awaiting DISCOM inspection.
+   - Public Tracker: `/track/PR-1026`.
+
+---
+
+## 4. Production Deployment (Vercel)
+
+The application is built on **Next.js 16 App Router** with full React 19 support and deploys to **Vercel** with zero configuration.
 
 ### Steps to Deploy to Vercel:
 1. Push this repository to your public GitHub account:
    ```bash
    git add .
-   git commit -m "feat: complete rooftop solar platform with RBAC authentication and dated subsidy rules"
+   git commit -m "feat: complete SolarSaathi rooftop solar platform with RBAC authentication and dated subsidy rules"
    git branch -M main
    git remote add origin <YOUR_GITHUB_REPO_URL>
    git push -u origin main
@@ -83,8 +110,8 @@ The application is built on **Next.js 16 App Router** and deploys to **Vercel** 
 
 ---
 
-## 4. Environment Variables Reference
+## 5. Environment Variables Reference
 
 | Variable Name | Required? | Purpose |
 | :--- | :---: | :--- |
-| `GEMINI_API_KEY` | Optional | Powers live Google Gemini 2.5 Flash Vision OCR on electricity bill images. If omitted, the built-in parser seamlessly handles evaluation with zero errors. |
+| `GEMINI_API_KEY` | Optional | Powers live Google Gemini 2.5 Flash Vision OCR on electricity bill images. If omitted, the built-in parser seamlessly handles evaluation with confidence scores and zero errors. |

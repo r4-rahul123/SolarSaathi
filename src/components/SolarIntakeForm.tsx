@@ -15,15 +15,23 @@ import {
   Edit3,
   ShieldAlert,
   QrCode,
+  ShieldCheck,
+  TrendingUp,
+  Percent,
+  Check,
+  Building,
 } from "lucide-react";
 import { BillExtraction, Lead, OccupancyType, RoofType } from "@/types/solar";
 import { QuoteDisplay } from "./QuoteDisplay";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface SolarIntakeFormProps {
   onLeadCreated?: (lead: Lead) => void;
 }
 
 export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
+  const { t } = useLanguage();
+
   // Step State: 1 = Details, 2 = AI Bill Verification, 3 = Quote
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
@@ -83,7 +91,13 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
         monthlyUnits: 340,
         monthlyAmount: 3200,
         billingUnit: "Nagpur Urban BU-41",
-        confidence: "High",
+        confidence: {
+          consumerNumber: 0.98,
+          tariff: 0.95,
+          sanctionedLoadKw: 0.91,
+          monthlyUnits: 0.88,
+          overall: "High",
+        },
         extractionNotes: "MSEDCL residential bill verified. High consumption (340 kWh/mo) qualifies for priority 3kW setup.",
       });
     } else if (sampleType === "tenant") {
@@ -109,7 +123,13 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
         monthlyUnits: 210,
         monthlyAmount: 1900,
         billingUnit: "Nagpur South",
-        confidence: "High",
+        confidence: {
+          consumerNumber: 0.98,
+          tariff: 0.95,
+          sanctionedLoadKw: 0.91,
+          monthlyUnits: 0.88,
+          overall: "High",
+        },
         extractionNotes: "Rooftop solar requires landlord owner NOC. Diverted to phone consultation desk.",
       });
     } else {
@@ -135,7 +155,13 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
         monthlyUnits: 85,
         monthlyAmount: 650,
         billingUnit: "Nagpur West",
-        confidence: "High",
+        confidence: {
+          consumerNumber: 0.98,
+          tariff: 0.95,
+          sanctionedLoadKw: 0.91,
+          monthlyUnits: 0.88,
+          overall: "High",
+        },
         extractionNotes: "Small bill (<₹800/mo). Payback period is >7 years; unviable for physical survey. Converted to phone advisory.",
       });
     }
@@ -186,7 +212,13 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
       setMonthlyUnits(320);
       setMonthlyBill(3100);
       setExtraction({
-        confidence: "Medium",
+        confidence: {
+          consumerNumber: 0.65,
+          tariff: 0.6,
+          sanctionedLoadKw: 0.55,
+          monthlyUnits: 0.5,
+          overall: "Medium",
+        },
         extractionNotes: "AI extraction fallback applied. Please verify values manually below.",
       });
     } finally {
@@ -219,7 +251,13 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
           sanctionedLoadKw: Number(sanctionedLoad),
           monthlyUnits: Number(monthlyUnits),
           monthlyAmount: Number(monthlyBill),
-          confidence: "High",
+          confidence: {
+            consumerNumber: 0.98,
+            tariff: 0.95,
+            sanctionedLoadKw: 0.91,
+            monthlyUnits: 0.88,
+            overall: "High",
+          },
           extractionNotes: "Customer verified and submitted.",
         },
       };
@@ -245,35 +283,152 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
   };
 
   if (step === 3 && createdLead) {
+    const breakdown = createdLead.scoreBreakdown;
+    const isHigh = createdLead.score === "High" || breakdown?.tier === "High";
+
     return (
       <div className="space-y-6">
         {/* Status Alert Banner */}
-        {createdLead.score === "High" ? (
-          <div className="bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/40 rounded-3xl p-6 flex items-start gap-4 backdrop-blur-sm shadow-sm">
-            <div className="p-2.5 bg-emerald-500 text-white rounded-2xl shadow-xs shrink-0">
-              <CheckCircle className="w-6 h-6" />
+        {isHigh ? (
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 border-2 border-[#198754]/40 rounded-3xl p-6 flex flex-col sm:flex-row items-start gap-4 backdrop-blur-sm shadow-md">
+            <div className="p-3 bg-[#198754] text-white rounded-2xl shadow-md shrink-0">
+              <CheckCircle className="w-7 h-7" />
             </div>
-            <div>
-              <h4 className="font-extrabold text-emerald-950 dark:text-emerald-300 text-base">
-                Priority Rooftop Survey Approved • Eligible for ₹78,000 Central Subsidy
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#198754] text-white">
+                  PRIORITY APPROVED
+                </span>
+                <span className="text-xs font-bold text-[#123D2B] dark:text-emerald-300">
+                  Ref: #{createdLead.id}
+                </span>
+              </div>
+              <h4 className="font-black text-[#123D2B] dark:text-emerald-200 text-lg">
+                Priority Rooftop Survey Approved • Eligible for ₹78,000 Central PM Subsidy
               </h4>
-              <p className="text-xs sm:text-sm text-emerald-800 dark:text-emerald-200 mt-1 font-medium leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 mt-1 font-medium leading-relaxed">
                 Your monthly consumption of <strong>{createdLead.avgUnitsPerMonth} units</strong> and verified roof ownership qualify you for immediate engineer assignment and same-day net-metering initiation.
               </p>
             </div>
           </div>
         ) : (
-          <div className="bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/40 rounded-3xl p-6 flex items-start gap-4 backdrop-blur-sm shadow-sm">
-            <div className="p-2.5 bg-amber-500 text-white rounded-2xl shadow-xs shrink-0">
-              <AlertCircle className="w-6 h-6" />
+          <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-500/40 rounded-3xl p-6 flex flex-col sm:flex-row items-start gap-4 backdrop-blur-sm shadow-md">
+            <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-md shrink-0">
+              <AlertCircle className="w-7 h-7" />
             </div>
-            <div>
-              <h4 className="font-extrabold text-amber-950 dark:text-amber-300 text-base">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500 text-white">
+                  TELE-ADVISORY QUEUE
+                </span>
+                <span className="text-xs font-bold text-amber-900 dark:text-amber-300">
+                  Ref: #{createdLead.id}
+                </span>
+              </div>
+              <h4 className="font-black text-amber-950 dark:text-amber-200 text-lg">
                 Assigned to Solar Tele-Advisory Desk
               </h4>
-              <p className="text-xs sm:text-sm text-amber-800 dark:text-amber-200 mt-1 font-medium leading-relaxed">
-                {createdLead.scoreReason} Our solar consultant will contact you via WhatsApp / phone to evaluate community solar or owner NOC options.
+              <p className="text-xs sm:text-sm text-amber-900 dark:text-amber-300 mt-1 font-medium leading-relaxed">
+                {breakdown?.explanation || createdLead.scoreReason || "Your application is routed for phone advisory."} Our solar consultant will contact you via WhatsApp / phone to evaluate community solar or owner NOC options.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* 100-POINT TRANSPARENT SCORE BREAKDOWN CARD */}
+        {breakdown && (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-7 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#198754] flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4" /> Transparent Lead Qualification Breakdown
+                </span>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                  Solar Fit Score: {breakdown.totalScore} / 100
+                </h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="text-xs text-slate-400 block font-medium">Evaluation Tier</span>
+                  <span
+                    className={`font-black text-xs px-3 py-1 rounded-full uppercase tracking-wider ${
+                      breakdown.tier === "High"
+                        ? "bg-[#E7F3EC] text-[#123D2B] border border-[#198754]/40"
+                        : "bg-amber-100 text-amber-900 border border-amber-300"
+                    }`}
+                  >
+                    {breakdown.tier === "High" ? "★ High Fit (Survey)" : "Tele-Consult Fit"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Overall Score Progress Bar */}
+            <div>
+              <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-1000 ${
+                    breakdown.tier === "High" ? "bg-[#198754]" : "bg-amber-500"
+                  }`}
+                  style={{ width: `${Math.min(breakdown.totalScore, 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">
+                {breakdown.explanation}
+              </p>
+            </div>
+
+            {/* Score Component Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 text-xs">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/60">
+                <span className="text-slate-400 block text-[11px] font-medium">Roof Ownership</span>
+                <span className="font-mono font-black text-[#123D2B] dark:text-emerald-400 text-sm">
+                  {breakdown.ownershipPoints} / 25
+                </span>
+                <span className="block text-[10px] text-slate-500 mt-0.5">
+                  {occupancy === "Owner" ? "Owner (+25)" : "Tenant (+5)"}
+                </span>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/60">
+                <span className="text-slate-400 block text-[11px] font-medium">Monthly Bill</span>
+                <span className="font-mono font-black text-[#123D2B] dark:text-emerald-400 text-sm">
+                  {breakdown.billPoints} / 25
+                </span>
+                <span className="block text-[10px] text-slate-500 mt-0.5">₹{monthlyBill}/month</span>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/60">
+                <span className="text-slate-400 block text-[11px] font-medium">Shadow-Free Area</span>
+                <span className="font-mono font-black text-[#123D2B] dark:text-emerald-400 text-sm">
+                  {breakdown.roofAreaPoints} / 20
+                </span>
+                <span className="block text-[10px] text-slate-500 mt-0.5">{roofAreaSqFt} sq. ft.</span>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/60">
+                <span className="text-slate-400 block text-[11px] font-medium">Power Consumption</span>
+                <span className="font-mono font-black text-[#123D2B] dark:text-emerald-400 text-sm">
+                  {breakdown.consumptionPoints} / 20
+                </span>
+                <span className="block text-[10px] text-slate-500 mt-0.5">{monthlyUnits} kWh</span>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/60 col-span-2 sm:col-span-1">
+                <span className="text-slate-400 block text-[11px] font-medium">Feeder Serviceability</span>
+                <span className="font-mono font-black text-[#123D2B] dark:text-emerald-400 text-sm">
+                  {breakdown.serviceabilityPoints} / 10
+                </span>
+                <span className="block text-[10px] text-slate-500 mt-0.5">Nagpur PIN {pincode}</span>
+              </div>
+            </div>
+
+            {/* Why Tele-Advisory Desk Notice */}
+            <div className="p-3.5 bg-[#E7F3EC]/60 dark:bg-[#123D2B]/30 rounded-2xl border border-[#198754]/30 text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2.5">
+              <Sparkles className="w-4 h-4 text-[#198754] shrink-0 mt-0.5" />
+              <span>
+                <strong>Operational Optimization Note:</strong> Physical site visits in Nagpur cost an estimated <strong>₹2,500 each</strong> in certified engineer time and transit. SolarSaathi automatically qualifies leads so homeowners receive instant transparent recommendations while eliminating wasted visits.
+              </span>
             </div>
           </div>
         )}
@@ -288,7 +443,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
       {/* Top Header & Step Progress Bar */}
       <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-6 py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black text-sm shadow-xs">
+          <div className="w-9 h-9 rounded-2xl bg-[#123D2B] text-white flex items-center justify-center font-black text-sm shadow-xs">
             {step === 1 ? "1" : "2"}
           </div>
           <div>
@@ -296,7 +451,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
               {step === 1 ? "Step 1: Rooftop Property & Contact" : "Step 2: AI Bill Reader & Side-by-Side Review"}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              {step === 1 ? "Takes 60 seconds • Nagpur & Vidarbha pin codes" : "Gemini Vision OCR extraction from MSEDCL bill"}
+              {step === 1 ? "Takes 60 seconds • Nagpur & Vidarbha PIN codes" : "Gemini Vision OCR extraction from MSEDCL bill"}
             </p>
           </div>
         </div>
@@ -307,7 +462,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
           <button
             type="button"
             onClick={() => handleLoadSample("standard")}
-            className="px-3 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
+            className="px-3 py-1.5 text-xs font-bold bg-[#123D2B] hover:bg-[#198754] text-white rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
           >
             ★ Sample High (Owner)
           </button>
@@ -352,7 +507,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
           >
             <div>
               <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <User className="w-5 h-5 text-amber-500" />
+                <User className="w-5 h-5 text-[#198754]" />
                 Contact & Installation Address
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
@@ -371,7 +526,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                   placeholder="e.g. Prashant Wankhede"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                  className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -385,7 +540,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                   placeholder="e.g. +91 98231 44521"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                  className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -398,7 +553,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                   placeholder="e.g. prashant.w@gmail.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                  className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -409,7 +564,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 <select
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                  className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                 >
                   <option value="Nagpur">Nagpur (Urban / Rural Circle)</option>
                   <option value="Wardha">Wardha</option>
@@ -421,7 +576,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
               <div className="sm:col-span-2">
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Rooftop Address & Pincode
+                  Rooftop Address & PIN code
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -429,14 +584,14 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                     placeholder="Plot / Street / Area (e.g. Somalwada, Wardha Road)"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                    className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   />
                   <input
                     type="text"
-                    placeholder="Pincode"
+                    placeholder="PIN code"
                     value={pincode}
                     onChange={(e) => setPincode(e.target.value)}
-                    className="w-32 px-4 py-2.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-mono font-bold transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                    className="w-32 px-4 py-2.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] font-mono font-bold transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -444,7 +599,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
             <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
               <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 mb-1">
-                <Home className="w-5 h-5 text-amber-500" />
+                <Home className="w-5 h-5 text-[#198754]" />
                 Rooftop Ownership & Structure
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4 font-medium">
@@ -462,22 +617,22 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                       onClick={() => setOccupancy("Owner")}
                       className={`py-3 text-xs sm:text-sm font-extrabold rounded-2xl border transition-all cursor-pointer ${
                         occupancy === "Owner"
-                          ? "bg-amber-500 text-white border-amber-600 shadow-md shadow-amber-500/20 scale-[1.02]"
+                          ? "bg-[#123D2B] text-white border-[#123D2B] shadow-md scale-[1.02]"
                           : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                       }`}
                     >
-                      ✓ House Owner
+                      ✓ {t("owner")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setOccupancy("Tenant")}
                       className={`py-3 text-xs sm:text-sm font-extrabold rounded-2xl border transition-all cursor-pointer ${
                         occupancy === "Tenant"
-                          ? "bg-amber-500 text-white border-amber-600 shadow-md shadow-amber-500/20 scale-[1.02]"
+                          ? "bg-[#123D2B] text-white border-[#123D2B] shadow-md scale-[1.02]"
                           : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                       }`}
                     >
-                      Tenant / Rented
+                      {t("tenant")}
                     </button>
                   </div>
                 </div>
@@ -489,7 +644,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                   <select
                     value={roofType}
                     onChange={(e) => setRoofType(e.target.value as RoofType)}
-                    className="w-full px-4 py-3 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                    className="w-full px-4 py-3 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   >
                     <option value="Concrete Flat">Concrete Flat Slab (Most common)</option>
                     <option value="Tin Shed">Tin / Metal Shed</option>
@@ -503,7 +658,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                     <label className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
                       Approximate Rooftop Shadow-Free Area (sq. ft.)
                     </label>
-                    <span className="font-mono text-xs sm:text-sm font-black text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                    <span className="font-mono text-xs sm:text-sm font-black text-[#198754] bg-[#E7F3EC] dark:bg-[#123D2B]/50 px-2.5 py-1 rounded-lg border border-[#198754]/30">
                       {roofAreaSqFt} sq. ft. (~{(roofAreaSqFt / 100).toFixed(1)} kW capacity)
                     </span>
                   </div>
@@ -514,7 +669,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                     step="50"
                     value={roofAreaSqFt}
                     onChange={(e) => setRoofAreaSqFt(Number(e.target.value))}
-                    className="w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    className="w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#198754]"
                   />
                 </div>
               </div>
@@ -523,7 +678,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             <div className="flex justify-end pt-4">
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] cursor-pointer"
+                className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#123D2B] hover:bg-[#198754] text-white rounded-2xl font-black text-sm shadow-lg shadow-[#123D2B]/20 transition-all hover:scale-[1.02] cursor-pointer"
               >
                 <span>Continue to Bill Verification</span>
                 <ArrowRight className="w-4 h-4" />
@@ -538,7 +693,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-amber-500" />
+                  <Zap className="w-5 h-5 text-[#198754]" />
                   MSEDCL Electricity Bill Analysis
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
@@ -549,14 +704,14 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                className="text-xs font-bold text-[#198754] dark:text-emerald-400 hover:underline cursor-pointer"
               >
                 ← Edit Step 1
               </button>
             </div>
 
             {/* Upload Area */}
-            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-amber-500 rounded-3xl p-6 text-center bg-slate-50/50 dark:bg-slate-950/50 transition-colors">
+            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-[#198754] rounded-3xl p-6 text-center bg-slate-50/50 dark:bg-slate-950/50 transition-colors">
               <input
                 type="file"
                 id="bill-upload-input"
@@ -568,9 +723,9 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 htmlFor="bill-upload-input"
                 className="cursor-pointer flex flex-col items-center justify-center gap-2.5"
               >
-                <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center shadow-xs">
+                <div className="w-14 h-14 rounded-2xl bg-[#E7F3EC] dark:bg-[#123D2B]/60 text-[#198754] flex items-center justify-center shadow-xs">
                   {isAnalyzing ? (
-                    <RefreshCw className="w-7 h-7 animate-spin text-amber-500" />
+                    <RefreshCw className="w-7 h-7 animate-spin text-[#198754]" />
                   ) : (
                     <Upload className="w-7 h-7" />
                   )}
@@ -581,7 +736,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                       ? "AI is analyzing electricity bill..."
                       : billFileName
                       ? `Selected: ${billFileName}`
-                      : "Upload MSEDCL Bill Photo or PDF"}
+                      : t("uploadBill")}
                   </span>
                   <p className="text-xs text-slate-400 mt-1 font-medium">
                     Fast OCR via Gemini Vision • JPG, PNG or PDF
@@ -594,7 +749,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             <div className="bg-slate-50 dark:bg-slate-950 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-500 animate-spin" />
+                  <Sparkles className="w-4 h-4 text-[#198754]" />
                   <span className="text-xs uppercase tracking-wider font-black text-slate-800 dark:text-slate-200">
                     Side-by-Side Document & Field Verification
                   </span>
@@ -608,8 +763,14 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                   >
                     {isBlurryMock ? "Simulate Clear Photo" : "Simulate Blurry Photo"}
                   </button>
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-300 dark:border-emerald-700/60">
-                    {isBlurryMock ? "⚠ Low Confidence" : "✓ High Confidence"}
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border ${
+                      isBlurryMock
+                        ? "text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 border-amber-300"
+                        : "text-[#123D2B] dark:text-emerald-300 bg-[#E7F3EC] dark:bg-emerald-950/80 border-[#198754]/40"
+                    }`}
+                  >
+                    {isBlurryMock ? "⚠ Low Confidence" : "✓ High Confidence (98%)"}
                   </span>
                 </div>
               </div>
@@ -618,7 +779,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 <div className="p-4 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-2xl text-xs sm:text-sm text-amber-900 dark:text-amber-200 flex items-center gap-3 font-medium">
                   <ShieldAlert className="w-5 h-5 shrink-0 text-amber-500" />
                   <span>
-                    <strong>Blurry Photo Notice:</strong> Some values could not be read clearly. Please confirm or edit the numbers manually below before proceeding.
+                    <strong>Blurry Photo Notice:</strong> Some values could not be read clearly. Confidence scores have dropped. Please confirm or edit the numbers manually below before proceeding.
                   </span>
                 </div>
               )}
@@ -633,15 +794,20 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                       </span>
                       <span className="text-[11px] text-slate-400">Nagpur Urban Circle • BU 41</span>
                     </div>
-                    <span className="text-[11px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 px-2.5 py-1 rounded-lg border border-amber-300 dark:border-amber-700 font-bold">
+                    <span className="text-[11px] bg-[#E7F3EC] dark:bg-[#123D2B]/50 text-[#123D2B] dark:text-emerald-300 px-2.5 py-1 rounded-lg border border-[#198754]/30 font-bold">
                       LT-I RESIDENTIAL
                     </span>
                   </div>
 
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-sans">Consumer No:</span>
-                      <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md text-sm">
+                      <span className="text-slate-400 font-sans flex items-center gap-1.5">
+                        Consumer No:
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                          {isBlurryMock ? "42%" : "98%"}
+                        </span>
+                      </span>
+                      <span className="font-bold text-[#123D2B] dark:text-emerald-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-sm">
                         {consumerNumber || "410019283741"}
                       </span>
                     </div>
@@ -650,13 +816,34 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                       <span className="font-bold text-slate-800 dark:text-slate-100">{name || "Prashant Wankhede"}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-sans">Sanctioned Load:</span>
+                      <span className="text-slate-400 font-sans flex items-center gap-1.5">
+                        Sanctioned Load:
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                          {isBlurryMock ? "35%" : "91%"}
+                        </span>
+                      </span>
                       <span className="font-bold text-slate-800 dark:text-slate-100">{sanctionedLoad} kW</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-sans">Billed Units (kWh):</span>
-                      <span className="font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md text-sm">
+                      <span className="text-slate-400 font-sans flex items-center gap-1.5">
+                        Billed Units (kWh):
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                          {isBlurryMock ? "48%" : "88%"}
+                        </span>
+                      </span>
+                      <span className="font-black text-[#198754] dark:text-emerald-400 bg-[#E7F3EC] dark:bg-[#123D2B]/50 px-2 py-0.5 rounded-md text-sm">
                         {monthlyUnits} Units
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-sans flex items-center gap-1.5">
+                        Tariff Category:
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                          {isBlurryMock ? "40%" : "95%"}
+                        </span>
+                      </span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        {tariff}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -669,7 +856,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
                   <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
                     <span className="flex items-center gap-1 font-sans">
-                      <QrCode className="w-3.5 h-3.5 text-amber-500" /> Barcode Verified
+                      <QrCode className="w-3.5 h-3.5 text-[#198754]" /> Barcode Verified
                     </span>
                     <span className="truncate max-w-[140px]">{billFileName}</span>
                   </div>
@@ -679,7 +866,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <Edit3 className="w-4 h-4 text-amber-500" />
+                      <Edit3 className="w-4 h-4 text-[#198754]" />
                       Verify / Adjust Extracted Values
                     </span>
                     <span className="text-xs text-slate-400 font-medium">Editable fields</span>
@@ -687,27 +874,33 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Consumer Number (12 digits)
-                      </label>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          Consumer Number (12 digits)
+                        </label>
+                        <span className="text-[10px] text-[#198754] font-bold">Confidence: {isBlurryMock ? "42%" : "98%"}</span>
+                      </div>
                       <input
                         type="text"
                         value={consumerNumber}
                         onChange={(e) => setConsumerNumber(e.target.value)}
-                        className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl focus:border-amber-500 focus:outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                        className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl focus:border-[#198754] focus:outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-2.5">
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          Monthly Units (kWh) *
-                        </label>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Monthly Units (kWh) *
+                          </label>
+                          <span className="text-[10px] text-[#198754] font-bold">{isBlurryMock ? "48%" : "88%"}</span>
+                        </div>
                         <input
                           type="number"
                           value={monthlyUnits}
                           onChange={(e) => setMonthlyUnits(Number(e.target.value))}
-                          className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-black text-amber-600 dark:text-amber-400 border border-slate-300 dark:border-slate-700 rounded-xl focus:border-amber-500 focus:outline-none bg-white dark:bg-slate-950"
+                          className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-black text-[#198754] dark:text-emerald-400 border border-slate-300 dark:border-slate-700 rounded-xl focus:border-[#198754] focus:outline-none bg-white dark:bg-slate-950"
                         />
                       </div>
 
@@ -719,34 +912,40 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                           type="number"
                           value={monthlyBill}
                           onChange={(e) => setMonthlyBill(Number(e.target.value))}
-                          className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-black text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl focus:border-amber-500 focus:outline-none bg-white dark:bg-slate-950"
+                          className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-black text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl focus:border-[#198754] focus:outline-none bg-white dark:bg-slate-950"
                         />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2.5">
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          Sanctioned Load (kW)
-                        </label>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Sanctioned Load (kW)
+                          </label>
+                          <span className="text-[10px] text-[#198754] font-bold">{isBlurryMock ? "35%" : "91%"}</span>
+                        </div>
                         <input
                           type="number"
                           step="0.5"
                           value={sanctionedLoad}
                           onChange={(e) => setSanctionedLoad(Number(e.target.value))}
-                          className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl focus:border-amber-500 focus:outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                          className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl focus:border-[#198754] focus:outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          Tariff Category
-                        </label>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Tariff Category
+                          </label>
+                          <span className="text-[10px] text-[#198754] font-bold">{isBlurryMock ? "40%" : "95%"}</span>
+                        </div>
                         <input
                           type="text"
                           value={tariff}
                           onChange={(e) => setTariff(e.target.value)}
-                          className="w-full px-3.5 py-2 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:border-amber-500 focus:outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+                          className="w-full px-3.5 py-2 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:border-[#198754] focus:outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                         />
                       </div>
                     </div>
@@ -767,7 +966,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#123D2B] hover:bg-[#198754] text-white rounded-2xl font-black text-sm shadow-lg shadow-[#123D2B]/20 transition-all hover:scale-[1.02] disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (
                   <>

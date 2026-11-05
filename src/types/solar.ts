@@ -1,19 +1,36 @@
 export type OccupancyType = "Owner" | "Tenant";
 export type RoofType = "Concrete Flat" | "Tin Shed" | "Tiled Roof" | "Other";
+export type Language = "en" | "mr" | "hi";
 
-export type LeadScore = "High" | "Medium" | "Low";
+export type LeadScoreCategory = "High" | "Medium" | "Low";
 
-export type ProjectStatus =
-  | "LEAD_RECEIVED"
-  | "AI_QUALIFIED"
-  | "SURVEY_SCHEDULED"
-  | "SURVEY_COMPLETED"
-  | "DISCOM_APPLIED"
-  | "INSTALLATION_IN_PROGRESS"
-  | "NET_METER_INSTALLED"
+export interface ScoreBreakdown {
+  ownershipPoints: number;      // max 25
+  billPoints: number;           // max 25
+  roofAreaPoints: number;       // max 20
+  consumptionPoints: number;    // max 20
+  serviceabilityPoints: number; // max 10
+  totalScore: number;           // 0 - 100
+  tier: LeadScoreCategory;      // 70-100 High, 40-69 Medium, 0-39 Low
+  explanation: string;
+}
+
+export type ProjectStage =
+  | "LEAD_APPROVED"
+  | "SITE_SURVEY"
+  | "QUOTATION_APPROVED"
+  | "ADVANCE_PAYMENT"
+  | "INSTALLATION"
+  | "NET_METERING"
+  | "SUBSIDY_APPLICATION"
   | "SUBSIDY_CREDITED";
 
 export type NextAction = "SITE_VISIT" | "SHORT_CALL" | "DISCOM_FILING" | "INSTALL_METER" | "VERIFY_DOCS";
+
+export interface FieldConfidence {
+  value: number; // 0.00 to 1.00 (e.g. 0.98 = 98%)
+  status: "verified" | "needs_review" | "manual";
+}
 
 export interface BillExtraction {
   consumerNumber?: string;
@@ -21,16 +38,22 @@ export interface BillExtraction {
   sanctionedLoadKw?: number;
   monthlyUnits?: number;
   monthlyAmount?: number;
-  billingUnit?: string; // BU e.g. Nagpur Urban
+  billingUnit?: string;
   extractedAt?: string;
-  confidence: "High" | "Medium" | "Low" | "Unclear";
+  confidence?: {
+    consumerNumber?: number; // e.g. 0.98 (98%)
+    tariff?: number;         // e.g. 0.95 (95%)
+    sanctionedLoadKw?: number; // e.g. 0.91 (91%)
+    monthlyUnits?: number;   // e.g. 0.88 (88%)
+    overall: "High" | "Medium" | "Low" | "Unclear";
+  };
   extractionNotes?: string;
   rawResponse?: string;
 }
 
-export interface SolarQuote {
+export interface QuoteOption {
   systemSizeKw: number;
-  grossCost: number;
+  installationCost: number;
   subsidyAmount: number;
   netCost: number;
   annualGenerationUnits: number;
@@ -38,20 +61,46 @@ export interface SolarQuote {
   monthlySavings: number;
   paybackYears: number;
   lifetimeSavings25Yrs: number;
-  rateRuleId: string;
-  createdAt: string;
+  isRecommended?: boolean;
 }
 
-export interface TimelineMilestone {
-  stage: ProjectStatus;
+export interface SolarQuote {
+  id: string;
+  leadId: string;
+  options: QuoteOption[];
+  recommendedSizeKw: number;
+  subsidyRuleId: string;
+  ruleSnapshot: {
+    ruleName: string;
+    effectiveDate: string;
+    maxCap: number;
+    generationFactor: number;
+    tariffAssumption: number;
+  };
+  status: "DRAFT" | "SENT" | "APPROVED" | "REJECTED";
+  createdAt: string;
+  validUntil: string;
+}
+
+export interface ProjectMilestone {
+  stage: ProjectStage;
   title: string;
   description: string;
   completedAt?: string;
   isCurrent?: boolean;
 }
 
+export interface MockNotification {
+  id: string;
+  channel: "WhatsApp" | "SMS";
+  recipient: string;
+  message: string;
+  sentAt: string;
+  status: "DELIVERED" | "READ";
+}
+
 export interface Lead {
-  id: string; // e.g. LD-30881
+  id: string; // e.g. LD-30881 / PROJECT-1024
   name: string;
   phone: string;
   email?: string;
@@ -67,20 +116,27 @@ export interface Lead {
   billImageName?: string;
   billExtraction?: BillExtraction;
   recommendedKw: number;
-  score: LeadScore;
-  scoreReason: string;
-  status: ProjectStatus;
+  scoreBreakdown: ScoreBreakdown;
+  score?: LeadScoreCategory;
+  scoreReason?: string;
+  status: ProjectStage;
   nextAction: NextAction;
   quote?: SolarQuote;
-  timeline: TimelineMilestone[];
+  timeline: ProjectMilestone[];
+  notifications: MockNotification[];
+  assignedStaff?: string;
+  lastUpdatedDaysAgo: number;
+  isStuck?: boolean; // True if status unchanged for > 7 days
   createdAt: string;
   updatedAt: string;
 }
 
-export interface SubsidyRuleRate {
-  minKw: number;
-  maxKw: number;
-  ratePerKw: number;
+export interface PricingRule {
+  systemSizeKw: number;
+  price: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  isActive: boolean;
 }
 
 export interface SubsidyRule {
@@ -89,10 +145,10 @@ export interface SubsidyRule {
   effectiveFrom: string;
   effectiveTo?: string;
   description: string;
-  rates: SubsidyRuleRate[];
-  maxSubsidyCap: number;
-  generationPerKwPerYear: number; // default: 1400
-  gridTariffPerUnit: number; // default ₹7.50
-  costPerKwRate: number; // benchmark installation cost per kW
+  tier1RatePerKw: number; // up to 2 kW: ₹30,000
+  tier2RatePerKw: number; // 3rd kW: ₹18,000
+  maxSubsidyCap: number;  // ₹78,000
+  generationPerKwPerYear: number; // 1,400 units
+  gridTariffPerUnit: number; // ₹8.00 / kWh
   isActive: boolean;
 }

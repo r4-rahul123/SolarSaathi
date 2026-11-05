@@ -1,70 +1,74 @@
-import { LeadScore, NextAction, OccupancyType, SolarQuote, SubsidyRule } from "@/types/solar";
+import {
+  OccupancyType,
+  ScoreBreakdown,
+  SolarQuote,
+  QuoteOption,
+  SubsidyRule,
+  PricingRule,
+  NextAction,
+} from "@/types/solar";
 
 export const DEFAULT_SUBSIDY_RULE: SubsidyRule = {
   id: "PM-SURYA-GHAR-2026",
-  name: "PM Surya Ghar: Muft Bijli Yojana (Vidarbha / Maharashtra)",
+  name: "PM Surya Ghar: Muft Bijli Yojana (Nagpur & Vidarbha)",
   effectiveFrom: "2024-02-15",
   effectiveTo: "2027-03-31",
   description:
     "Central residential rooftop solar scheme: ₹30,000/kW for 1st & 2nd kW, ₹18,000 for 3rd kW, capped at ₹78,000 maximum subsidy.",
-  rates: [
-    { minKw: 0, maxKw: 2, ratePerKw: 30000 },
-    { minKw: 2, maxKw: 3, ratePerKw: 18000 },
-  ],
+  tier1RatePerKw: 30000,
+  tier2RatePerKw: 18000,
   maxSubsidyCap: 78000,
   generationPerKwPerYear: 1400, // Explicitly specified in client brief
-  gridTariffPerUnit: 7.5, // Average MSEB Tier-1 residential tariff ₹/unit
-  costPerKwRate: 60000, // Benchmark turnkey cost per kW in Vidarbha
+  gridTariffPerUnit: 8.0,       // ₹8.00 / kWh average MSEDCL residential slab
   isActive: true,
 };
+
+export const DEFAULT_PRICING_RULES: PricingRule[] = [
+  { systemSizeKw: 1, price: 75000, effectiveFrom: "2024-01-01", isActive: true },
+  { systemSizeKw: 2, price: 140000, effectiveFrom: "2024-01-01", isActive: true },
+  { systemSizeKw: 3, price: 195000, effectiveFrom: "2024-01-01", isActive: true },
+];
 
 /**
  * Calculates central government subsidy based on dated rule tables
  */
 export function calculateSubsidy(systemSizeKw: number, rule: SubsidyRule = DEFAULT_SUBSIDY_RULE): number {
-  let subsidy = 0;
-
   if (systemSizeKw <= 0) return 0;
 
-  // 1st tier: up to 2 kW @ ₹30,000/kW
+  let subsidy = 0;
+  // Tier 1: up to 2 kW @ ₹30,000/kW
   const tier1Kw = Math.min(systemSizeKw, 2);
-  subsidy += tier1Kw * 30000;
+  subsidy += tier1Kw * rule.tier1RatePerKw;
 
-  // 2nd tier: 2 kW to 3 kW @ ₹18,000/kW
+  // Tier 2: 2 kW to 3 kW @ ₹18,000/kW
   if (systemSizeKw > 2) {
     const tier2Kw = Math.min(systemSizeKw - 2, 1);
-    subsidy += tier2Kw * 18000;
+    subsidy += tier2Kw * rule.tier2RatePerKw;
   }
 
-  // Cap at maximum allowable subsidy
   return Math.min(subsidy, rule.maxSubsidyCap);
 }
 
 /**
- * Calculates complete financial breakdown & payback story for homeowner
+ * Generates single quote option
  */
-export function calculateSolarQuote(
-  systemSizeKw: number,
-  rule: SubsidyRule = DEFAULT_SUBSIDY_RULE
-): SolarQuote {
-  const grossCost = systemSizeKw * rule.costPerKwRate;
-  const subsidyAmount = calculateSubsidy(systemSizeKw, rule);
-  const netCost = grossCost - subsidyAmount;
-
-  const annualGenerationUnits = systemSizeKw * rule.generationPerKwPerYear;
+function buildOption(
+  kw: number,
+  installationPrice: number,
+  rule: SubsidyRule,
+  isRecommended: boolean = false
+): QuoteOption {
+  const subsidyAmount = calculateSubsidy(kw, rule);
+  const netCost = installationPrice - subsidyAmount;
+  const annualGenerationUnits = kw * rule.generationPerKwPerYear;
   const annualSavings = annualGenerationUnits * rule.gridTariffPerUnit;
   const monthlySavings = Math.round(annualSavings / 12);
-
-  // Payback in years (Net Cost / Annual Savings)
-  const paybackYears = Number((netCost / annualSavings).toFixed(1));
-
-  // 25 Years lifetime net savings
-  const lifetimeGrossSavings = annualSavings * 25;
-  const lifetimeSavings25Yrs = lifetimeGrossSavings - netCost;
+  const paybackYears = Number((netCost / annualSavings).toFixed(2));
+  const lifetimeSavings25Yrs = annualSavings * 25 - netCost;
 
   return {
-    systemSizeKw,
-    grossCost,
+    systemSizeKw: kw,
+    installationCost: installationPrice,
     subsidyAmount,
     netCost,
     annualGenerationUnits,
@@ -72,8 +76,38 @@ export function calculateSolarQuote(
     monthlySavings,
     paybackYears,
     lifetimeSavings25Yrs,
-    rateRuleId: rule.id,
+    isRecommended,
+  };
+}
+
+/**
+ * Builds the complete side-by-side 3-tier solar quote (1kW, 2kW, 3kW) with rule snapshot
+ */
+export function calculateSolarQuote(
+  leadId: string,
+  recommendedKw: number = 3,
+  rule: SubsidyRule = DEFAULT_SUBSIDY_RULE
+): SolarQuote {
+  const option1 = buildOption(1, 75000, rule, recommendedKw === 1);
+  const option2 = buildOption(2, 140000, rule, recommendedKw === 2);
+  const option3 = buildOption(3, 195000, rule, recommendedKw >= 3);
+
+  return {
+    id: `QT-${Math.floor(1000 + Math.random() * 9000)}`,
+    leadId,
+    options: [option1, option2, option3],
+    recommendedSizeKw: Math.min(3, Math.max(1, recommendedKw)),
+    subsidyRuleId: rule.id,
+    ruleSnapshot: {
+      ruleName: rule.name,
+      effectiveDate: rule.effectiveFrom,
+      maxCap: rule.maxSubsidyCap,
+      generationFactor: rule.generationPerKwPerYear,
+      tariffAssumption: rule.gridTariffPerUnit,
+    },
+    status: "SENT",
     createdAt: new Date().toISOString(),
+    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   };
 }
 
@@ -85,48 +119,80 @@ export function recommendSystemSize(avgUnitsPerMonth: number, rule: SubsidyRule 
   const annualUnits = avgUnitsPerMonth * 12;
   const rawSize = annualUnits / rule.generationPerKwPerYear;
   const rounded = Math.round(rawSize);
-  return Math.max(1, Math.min(rounded, 10)); // Clamp between 1kW and 10kW residential
+  return Math.max(1, Math.min(rounded, 3)); // 1kW to 3kW residential PM Surya Ghar
 }
 
 /**
- * Lead qualification & scoring engine (solves 40% wasted survey problem)
+ * Transparent 100-Point Hybrid Lead Scoring Engine
+ * Solves the ₹26.4 Lakhs wasted survey problem
  */
-export function scoreLead(
+export function calculateLeadScore(
   occupancy: OccupancyType,
   monthlyBill: number,
-  avgUnitsPerMonth: number
-): { score: LeadScore; reason: string; nextAction: NextAction } {
-  // Case 1: Tenant (cannot legally install without landlord deed)
+  avgUnitsPerMonth: number,
+  roofAreaSqFt: number = 500,
+  pincode: string = "440015"
+): { breakdown: ScoreBreakdown; nextAction: NextAction } {
+  // 1. Property ownership (max 25 pts)
+  const ownershipPoints = occupancy === "Owner" ? 25 : 5;
+
+  // 2. Monthly electricity bill (max 25 pts)
+  let billPoints = 5;
+  if (monthlyBill >= 2800) billPoints = 25;
+  else if (monthlyBill >= 1800) billPoints = 20;
+  else if (monthlyBill >= 1000) billPoints = 12;
+
+  // 3. Available roof area (max 20 pts)
+  let roofAreaPoints = 5;
+  if (roofAreaSqFt >= 500) roofAreaPoints = 20;
+  else if (roofAreaSqFt >= 300) roofAreaPoints = 14;
+
+  // 4. Electricity consumption (max 20 pts)
+  let consumptionPoints = 4;
+  if (avgUnitsPerMonth >= 300) consumptionPoints = 20;
+  else if (avgUnitsPerMonth >= 180) consumptionPoints = 14;
+  else if (avgUnitsPerMonth >= 100) consumptionPoints = 8;
+
+  // 5. Serviceability / Nagpur Vidarbha pincode (max 10 pts)
+  const serviceabilityPoints = pincode.startsWith("44") ? 10 : 6;
+
+  const totalScore = ownershipPoints + billPoints + roofAreaPoints + consumptionPoints + serviceabilityPoints;
+
+  let tier: "High" | "Medium" | "Low" = "Medium";
+  let explanation = "";
+  let nextAction: NextAction = "SITE_VISIT";
+
   if (occupancy === "Tenant") {
-    return {
-      score: "Low",
-      reason: "Tenant - rooftop property rights belong to owner. Physical survey replaced with a 5-minute phone call to avoid wasting ₹2,500 survey cost.",
-      nextAction: "SHORT_CALL",
-    };
+    tier = "Low";
+    nextAction = "SHORT_CALL";
+    explanation =
+      "Tenant lead. Rooftop property rights belong to landlord. Physical survey replaced with a 5-minute phone call to avoid wasting ₹2,500 survey cost.";
+  } else if (monthlyBill < 800 || avgUnitsPerMonth < 100) {
+    tier = "Low";
+    nextAction = "SHORT_CALL";
+    explanation =
+      "Small bill (<₹800/mo). Payback period is too long to justify ₹2,500 site visit. Queued for phone consultation instead.";
+  } else if (totalScore >= 70) {
+    tier = "High";
+    nextAction = "SITE_VISIT";
+    explanation = `High Priority Score (${totalScore}/100). Verified owner with high consumption (${avgUnitsPerMonth} kWh/mo). Immediate site survey approved.`;
+  } else {
+    tier = "Medium";
+    nextAction = "SITE_VISIT";
+    explanation = `Moderate Score (${totalScore}/100). Suitable for 1-2 kW system. Standard survey queue.`;
   }
 
-  // Case 2: Very small bill (< ₹800 or < 100 units)
-  if (monthlyBill < 800 || avgUnitsPerMonth < 100) {
-    return {
-      score: "Low",
-      reason: "Small bill (<₹800/mo). Payback period is too long to justify ₹2,500 site survey visit. Queued for phone consultation instead.",
-      nextAction: "SHORT_CALL",
-    };
-  }
-
-  // Case 3: High-value lead (> ₹2,500 or > 250 units)
-  if (monthlyBill >= 2500 || avgUnitsPerMonth >= 250) {
-    return {
-      score: "High",
-      reason: "Owner with high electricity consumption (>₹2,500/mo). Excellent payback period (~3.2 years). Scheduled for priority same-day site survey.",
-      nextAction: "SITE_VISIT",
-    };
-  }
-
-  // Case 4: Medium value lead (₹800 - ₹2,500)
   return {
-    score: "Medium",
-    reason: "Owner with moderate consumption. Suitable for 1-2 kW system. Qualified for standard site survey.",
-    nextAction: "SITE_VISIT",
+    breakdown: {
+      ownershipPoints,
+      billPoints,
+      roofAreaPoints,
+      consumptionPoints,
+      serviceabilityPoints,
+      totalScore,
+      tier,
+      explanation,
+    },
+    nextAction,
   };
 }

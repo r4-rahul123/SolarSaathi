@@ -12,14 +12,18 @@ import {
   LogOut,
   ChevronDown,
   Sparkles,
+  Languages,
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import { useAuth, UserRole } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const { user, logout, setIsAuthModalOpen, quickLogin } = useAuth();
+  const { lang, setLang, t } = useLanguage();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isLangOpen, setIsLangOpen] = useState(false);
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
@@ -28,7 +32,7 @@ export function Navbar() {
       case "SALES":
         return { label: "Sales Desk", bg: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300" };
       case "SURVEYOR":
-        return { label: "Site Surveyor", bg: "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300" };
+        return { label: "Surveyor", bg: "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300" };
       case "COORDINATOR":
         return { label: "Coordinator (Admin)", bg: "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300" };
     }
@@ -37,26 +41,26 @@ export function Navbar() {
   const badge = user ? getRoleBadge(user.role) : null;
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+    <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#06150F]/90 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Brand */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-white shadow-md shadow-amber-500/25 group-hover:scale-105 transition-all">
-              <Sun className="w-6 h-6 animate-[spin_16s_linear_infinite]" />
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#123D2B] to-[#198754] flex items-center justify-center text-white shadow-md shadow-emerald-900/20 group-hover:scale-105 transition-all">
+              <Sun className="w-6 h-6 text-amber-400 animate-[spin_16s_linear_infinite]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-lg text-slate-900 dark:text-white tracking-tight">
-                  Vidarbha<span className="text-amber-500">Solar</span>
+                <span className="font-extrabold text-lg text-[#123D2B] dark:text-emerald-400 tracking-tight">
+                  Solar<span className="text-[#198754] dark:text-white">Saathi</span>
                 </span>
-                <span className="hidden sm:inline-flex px-2 py-0.5 text-[11px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 rounded-full border border-amber-200 dark:border-amber-800/60">
+                <span className="hidden sm:inline-flex px-2 py-0.5 text-[11px] font-bold bg-[#E7F3EC] dark:bg-emerald-950/80 text-[#123D2B] dark:text-emerald-300 rounded-full border border-emerald-200 dark:border-emerald-800/60">
                   विदर्भ सोलर
                 </span>
               </div>
               <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
-                <MapPin className="w-3 h-3 text-amber-500" />
-                <span>Nagpur Rooftop Clean Energy</span>
+                <MapPin className="w-3 h-3 text-[#198754]" />
+                <span>Nagpur & Vidarbha Clean Energy</span>
               </div>
             </div>
           </Link>
@@ -65,25 +69,79 @@ export function Navbar() {
           <nav className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/"
-              className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors hidden md:inline-block"
+              className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-[#123D2B] dark:hover:text-emerald-400 px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors hidden md:inline-block"
             >
-              Get Solar Quote
+              {t("getQuote")}
             </Link>
             <Link
               href="/track/LD-30881"
-              className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors hidden sm:inline-block"
+              className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-[#123D2B] dark:hover:text-emerald-400 px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors hidden sm:inline-block"
             >
-              Track Project
+              {t("trackProject")}
             </Link>
 
             {/* Staff CRM Link */}
             <Link
               href="/admin"
-              className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-amber-950 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-700/60 px-3.5 py-1.5 rounded-xl transition-all shadow-xs"
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white bg-[#123D2B] hover:bg-[#198754] dark:bg-[#198754] dark:hover:bg-emerald-500 px-3.5 py-1.5 rounded-xl transition-all shadow-xs"
             >
-              <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>Staff CRM</span>
+              <ShieldCheck className="w-4 h-4 text-emerald-300" />
+              <span>{t("staffCrm")}</span>
             </Link>
+
+            {/* LANGUAGE SWITCHER DROPDOWN */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold transition-all cursor-pointer border border-slate-200 dark:border-slate-700"
+                title="Switch Language (English / मराठी / हिंदी)"
+              >
+                <Languages className="w-3.5 h-3.5 text-[#198754]" />
+                <span className="uppercase">{lang}</span>
+              </button>
+
+              {isLangOpen && (
+                <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl p-1.5 z-50 text-xs font-bold animate-in fade-in duration-150">
+                  <button
+                    onClick={() => {
+                      setLang("en");
+                      setIsLangOpen(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-between ${
+                      lang === "en" ? "bg-[#E7F3EC] text-[#123D2B] dark:bg-emerald-950 dark:text-emerald-300" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>English</span>
+                    {lang === "en" && <span>✓</span>}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLang("mr");
+                      setIsLangOpen(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-between ${
+                      lang === "mr" ? "bg-[#E7F3EC] text-[#123D2B] dark:bg-emerald-950 dark:text-emerald-300" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>मराठी</span>
+                    {lang === "mr" && <span>✓</span>}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLang("hi");
+                      setIsLangOpen(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-between ${
+                      lang === "hi" ? "bg-[#E7F3EC] text-[#123D2B] dark:bg-emerald-950 dark:text-emerald-300" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>हिंदी</span>
+                    {lang === "hi" && <span>✓</span>}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Role / User Button */}
             {user ? (
@@ -93,7 +151,7 @@ export function Navbar() {
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200"
                 >
-                  <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black text-xs">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-[#198754] dark:text-emerald-400 flex items-center justify-center font-black text-xs">
                     {user.name.charAt(0)}
                   </div>
                   <span className="hidden sm:inline max-w-[120px] truncate">{user.name}</span>
@@ -132,7 +190,7 @@ export function Navbar() {
                         className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between cursor-pointer"
                       >
                         <span>🏠 Homeowner</span>
-                        {user.role === "HOMEOWNER" && <span className="text-amber-500 font-bold">✓</span>}
+                        {user.role === "HOMEOWNER" && <span className="text-emerald-500 font-bold">✓</span>}
                       </button>
                       <button
                         onClick={() => {
@@ -142,7 +200,7 @@ export function Navbar() {
                         className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between cursor-pointer"
                       >
                         <span>📞 Sales Lead Desk</span>
-                        {user.role === "SALES" && <span className="text-amber-500 font-bold">✓</span>}
+                        {user.role === "SALES" && <span className="text-emerald-500 font-bold">✓</span>}
                       </button>
                       <button
                         onClick={() => {
@@ -152,7 +210,7 @@ export function Navbar() {
                         className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between cursor-pointer"
                       >
                         <span>🛠️ Site Surveyor</span>
-                        {user.role === "SURVEYOR" && <span className="text-amber-500 font-bold">✓</span>}
+                        {user.role === "SURVEYOR" && <span className="text-emerald-500 font-bold">✓</span>}
                       </button>
                       <button
                         onClick={() => {
@@ -162,7 +220,7 @@ export function Navbar() {
                         className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between cursor-pointer"
                       >
                         <span>📋 Admin / Coordinator</span>
-                        {user.role === "COORDINATOR" && <span className="text-amber-500 font-bold">✓</span>}
+                        {user.role === "COORDINATOR" && <span className="text-emerald-500 font-bold">✓</span>}
                       </button>
                     </div>
 
@@ -172,7 +230,7 @@ export function Navbar() {
                           setIsAuthModalOpen(true);
                           setIsDropdownOpen(false);
                         }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-amber-600 dark:text-amber-400 font-bold flex items-center gap-2 cursor-pointer"
+                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-[#198754] dark:text-emerald-400 font-bold flex items-center gap-2 cursor-pointer"
                       >
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>Open Auth Portal</span>
@@ -196,7 +254,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => setIsAuthModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs hover:opacity-90 transition-all cursor-pointer shadow-xs"
+                className="px-3.5 py-1.5 rounded-xl bg-[#123D2B] dark:bg-white text-white dark:text-slate-900 font-bold text-xs hover:opacity-90 transition-all cursor-pointer shadow-xs"
               >
                 Sign In
               </button>
@@ -219,17 +277,17 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 text-slate-200 text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2 border-t border-slate-800/60">
-        <span className="bg-emerald-500 text-white px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wide">
+      {/* Top Notification Strip */}
+      <div className="bg-[#123D2B] text-slate-200 text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2 border-t border-emerald-950">
+        <span className="bg-[#198754] text-white px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wide">
           PM Surya Ghar
         </span>
-        <span className="font-medium text-slate-200">
-          Get up to <strong className="text-amber-400 font-bold">₹78,000 Direct Bank Subsidy</strong> on Vidarbha Rooftops.
+        <span className="font-medium text-emerald-100">
+          {t("pmBanner")}
         </span>
-        <span className="hidden md:inline text-slate-500">|</span>
+        <span className="hidden md:inline text-emerald-700">|</span>
         <span className="hidden md:inline-flex items-center gap-1 text-amber-300 font-medium">
-          <PhoneCall className="w-3 h-3" /> Nagpur Helpline: 0712-254890
+          <PhoneCall className="w-3 h-3" /> Nagpur Desk: 0712-254890
         </span>
       </div>
     </header>

@@ -16,15 +16,15 @@ export const DEMO_ACCOUNTS: Record<UserRole, AuthUser & { passwordHint: string }
   HOMEOWNER: {
     id: "user-homeowner-1",
     name: "Prashant Wankhede",
-    email: "prashant@vidarbhasolar.in",
+    email: "customer@solarsaathi.demo",
     role: "HOMEOWNER",
     phone: "+91 98231 44521",
-    passwordHint: "user123",
+    passwordHint: "customer123",
   },
   SALES: {
     id: "staff-sales-1",
     name: "Sunil Deshpande",
-    email: "sales@vidarbhasolar.in",
+    email: "sales@solarsaathi.demo",
     role: "SALES",
     phone: "+91 98222 10001",
     passwordHint: "sales123",
@@ -32,7 +32,7 @@ export const DEMO_ACCOUNTS: Record<UserRole, AuthUser & { passwordHint: string }
   SURVEYOR: {
     id: "staff-surveyor-1",
     name: "Amit Verma (Site Engg)",
-    email: "surveyor@vidarbhasolar.in",
+    email: "surveyor@solarsaathi.demo",
     role: "SURVEYOR",
     phone: "+91 98222 10002",
     passwordHint: "survey123",
@@ -40,7 +40,7 @@ export const DEMO_ACCOUNTS: Record<UserRole, AuthUser & { passwordHint: string }
   COORDINATOR: {
     id: "staff-admin-1",
     name: "Dr. Ananya Joshi (Admin)",
-    email: "admin@vidarbhasolar.in",
+    email: "admin@solarsaathi.demo",
     role: "COORDINATOR",
     phone: "+91 98222 10003",
     passwordHint: "admin123",
@@ -72,8 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
-    // Check localStorage for persisted session
-    const saved = localStorage.getItem("vidarbha-solar-auth");
+    const saved = localStorage.getItem("solarsaathi-auth");
     if (saved) {
       try {
         setUser(JSON.parse(saved));
@@ -81,14 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error(e);
       }
     } else {
-      // Default initial session for reviewer convenience: Sales Staff
       setUser(DEMO_ACCOUNTS.COORDINATOR);
-      localStorage.setItem("vidarbha-solar-auth", JSON.stringify(DEMO_ACCOUNTS.COORDINATOR));
+      localStorage.setItem("solarsaathi-auth", JSON.stringify(DEMO_ACCOUNTS.COORDINATOR));
     }
   }, []);
 
   const login = (email: string, role: UserRole = "HOMEOWNER") => {
-    // Match with demo accounts or synthesize user
     const matchedRole = (Object.keys(DEMO_ACCOUNTS) as UserRole[]).find(
       (r) => DEMO_ACCOUNTS[r].email.toLowerCase() === email.toLowerCase()
     );
@@ -103,14 +100,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
 
     setUser(loggedUser);
-    localStorage.setItem("vidarbha-solar-auth", JSON.stringify(loggedUser));
+    localStorage.setItem("solarsaathi-auth", JSON.stringify(loggedUser));
     setIsAuthModalOpen(false);
   };
 
   const quickLogin = (role: UserRole) => {
     const demo = DEMO_ACCOUNTS[role];
     setUser(demo);
-    localStorage.setItem("vidarbha-solar-auth", JSON.stringify(demo));
+    localStorage.setItem("solarsaathi-auth", JSON.stringify(demo));
     setIsAuthModalOpen(false);
   };
 
@@ -122,13 +119,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role,
     };
     setUser(newUser);
-    localStorage.setItem("vidarbha-solar-auth", JSON.stringify(newUser));
+    localStorage.setItem("solarsaathi-auth", JSON.stringify(newUser));
     setIsAuthModalOpen(false);
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("vidarbha-solar-auth");
+    localStorage.removeItem("solarsaathi-auth");
   };
 
   return (
