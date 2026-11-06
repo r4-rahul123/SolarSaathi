@@ -8,6 +8,14 @@
         "-y",
         "@playwright/mcp@latest"
       ]
+    },
+    "semgrep": {
+      "command": "semgrep",
+      "args": [
+        "mcp",
+        "-t",
+        "stdio"
+      ]
     }
   }
 }

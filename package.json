@@ -9,6 +9,7 @@
     "db:setup": "node --env-file-if-exists=.env.local scripts/setup-db.mjs",
     "db:seed-demo": "node --env-file-if-exists=.env.local scripts/seed-demo-users.mjs",
     "test": "node --test tests/run-tests.mjs",
+    "security:scan": "semgrep scan --config auto",
     "lint": "eslint"
   },
   "dependencies": {
