@@ -1,89 +1,67 @@
 import { describe, test } from "node:test";
 import assert from "node:assert";
-
-// Core calculation logic mirroring src/lib/solar-calculator.ts for testing validation
-function calculateSubsidy(systemSizeKw, maxCap = 78000) {
-  let subsidy = 0;
-  if (systemSizeKw <= 0) return 0;
-  const tier1Kw = Math.min(systemSizeKw, 2);
-  subsidy += tier1Kw * 30000;
-  if (systemSizeKw > 2) {
-    const tier2Kw = Math.min(systemSizeKw - 2, 1);
-    subsidy += tier2Kw * 18000;
-  }
-  return Math.min(subsidy, maxCap);
-}
-
-function calculateSolarQuote(systemSizeKw, costPerKw = 60000, genBenchmark = 1400, tariff = 7.5) {
-  const grossCost = systemSizeKw * costPerKw;
-  const subsidyAmount = calculateSubsidy(systemSizeKw);
-  const netCost = grossCost - subsidyAmount;
-  const annualGenerationUnits = systemSizeKw * genBenchmark;
-  const annualSavings = annualGenerationUnits * tariff;
-  const paybackYears = Number((netCost / annualSavings).toFixed(1));
-
-  return {
-    systemSizeKw,
-    grossCost,
-    subsidyAmount,
-    netCost,
-    annualGenerationUnits,
-    annualSavings,
-    paybackYears,
-  };
-}
-
-function recommendSystemSize(avgUnitsPerMonth, genBenchmark = 1400) {
-  if (!avgUnitsPerMonth || avgUnitsPerMonth <= 0) return 1;
-  const annualUnits = avgUnitsPerMonth * 12;
-  const rounded = Math.round(annualUnits / genBenchmark);
-  return Math.max(1, Math.min(rounded, 10));
-}
-
-function scoreLead(occupancy, monthlyBill, avgUnitsPerMonth) {
-  if (occupancy === "Tenant") {
-    return { score: "Low", nextAction: "SHORT_CALL" };
-  }
-  if (monthlyBill < 800 || avgUnitsPerMonth < 100) {
-    return { score: "Low", nextAction: "SHORT_CALL" };
-  }
-  if (monthlyBill >= 2500 || avgUnitsPerMonth >= 250) {
-    return { score: "High", nextAction: "SITE_VISIT" };
-  }
-  return { score: "Medium", nextAction: "SITE_VISIT" };
-}
+import {
+  calculateSubsidy,
+  calculateSolarQuote,
+  recommendSystemSize,
+  calculateLeadScore,
+  DEFAULT_SUBSIDY_RULE,
+  DEFAULT_PRICING_RULES,
+} from "../src/lib/solar-calculator.ts";
 
 describe("Solar Financial & Subsidy Calculation Engine", () => {
   test("Central Scheme Subsidy correctly tiers at 1kW, 2kW, 3kW and caps at 78,000", () => {
+    // 1 kW: ₹30,000
     assert.strictEqual(calculateSubsidy(1), 30000);
+
+    // 2 kW: ₹60,000
     assert.strictEqual(calculateSubsidy(2), 60000);
+
+    // 3 kW: ₹60,000 + ₹18,000 = ₹78,000
     assert.strictEqual(calculateSubsidy(3), 78000);
+
+    // 5 kW: Capped at ₹78,000
     assert.strictEqual(calculateSubsidy(5), 78000);
+
+    // 10 kW: Still capped at ₹78,000
     assert.strictEqual(calculateSubsidy(10), 78000);
   });
 
   test("System sizing computes capacity based on 1,400 units/kW/year benchmark", () => {
+    // 340 units/month = 4,080 units/year / 1,400 = 2.91 -> 3 kW
     assert.strictEqual(recommendSystemSize(340), 3);
+
+    // 85 units/month = 1,020 units/year / 1,400 = 0.72 -> clamped to 1 kW
     assert.strictEqual(recommendSystemSize(85), 1);
   });
 
-  test("Homeowner Quote Payback matches expected ~3.2 years for 3 kW system", () => {
-    const quote = calculateSolarQuote(3);
-    assert.strictEqual(quote.systemSizeKw, 3);
-    assert.strictEqual(quote.grossCost, 180000);
-    assert.strictEqual(quote.subsidyAmount, 78000);
-    assert.strictEqual(quote.netCost, 102000);
-    assert.strictEqual(quote.annualGenerationUnits, 4200);
-    assert.strictEqual(quote.annualSavings, 31500);
-    assert.strictEqual(quote.paybackYears, 3.2);
+  test("Homeowner Quote Payback matches expected ~3.5 years for 3 kW system", () => {
+    const quote = calculateSolarQuote("TEST-LEAD-1", 3);
+    const option3kW = quote.options.find((opt) => opt.systemSizeKw === 3);
+    assert.ok(option3kW, "3kW quote option must exist");
+    assert.strictEqual(option3kW.systemSizeKw, 3);
+    assert.strictEqual(option3kW.installationCost, 195000);
+    assert.strictEqual(option3kW.subsidyAmount, 78000);
+    assert.strictEqual(option3kW.netCost, 117000);
+    assert.strictEqual(option3kW.annualGenerationUnits, 4200); // 3 * 1,400
+    assert.strictEqual(option3kW.annualSavings, 33600); // 4,200 * ₹8.00 grid tariff
+    assert.strictEqual(option3kW.paybackYears, 3.48); // 117,000 / 33,600
   });
 
   test("Lead qualification engine saves ₹2,500 survey costs on Tenants & Small Bills", () => {
-    assert.strictEqual(scoreLead("Tenant", 1900, 210).score, "Low");
-    assert.strictEqual(scoreLead("Tenant", 1900, 210).nextAction, "SHORT_CALL");
-    assert.strictEqual(scoreLead("Owner", 650, 85).score, "Low");
-    assert.strictEqual(scoreLead("Owner", 650, 85).nextAction, "SHORT_CALL");
-    assert.strictEqual(scoreLead("Owner", 3200, 340).score, "High");
-    assert.strictEqual(scoreLead("Owner", 3200, 340).nextAction, "SITE_VISIT");
+    // Case 1: Tenant -> Low tier, replaced with short call
+    const tenantResult = calculateLeadScore("Tenant", 1900, 210, 400, "440025");
+    assert.strictEqual(tenantResult.breakdown.tier, "Low");
+    assert.strictEqual(tenantResult.nextAction, "SHORT_CALL");
+
+    // Case 2: Small bill (< ₹800) -> Low tier, short call
+    const smallBillResult = calculateLeadScore("Owner", 650, 85, 300, "440012");
+    assert.strictEqual(smallBillResult.breakdown.tier, "Low");
+    assert.strictEqual(smallBillResult.nextAction, "SHORT_CALL");
+
+    // Case 3: High value owner (> ₹2,500) -> High tier, physical site visit
+    const highResult = calculateLeadScore("Owner", 3200, 340, 650, "440015");
+    assert.strictEqual(highResult.breakdown.tier, "High");
+    assert.strictEqual(highResult.nextAction, "SITE_VISIT");
   });
 });

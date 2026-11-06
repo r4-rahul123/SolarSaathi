@@ -10,8 +10,8 @@ export async function GET() {
     const pricing = await SolarDB.getPricingRules();
     return NextResponse.json({ success: true, rules, pricing });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Error fetching rules";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Error fetching rules:", err);
+    return NextResponse.json({ error: "Could not load rules. Please try again." }, { status: 500 });
   }
 }
 
@@ -22,7 +22,12 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
 
     if (body.type === "pricing") {
-      const updatedPricing = await SolarDB.updatePricingRule(body.systemSizeKw, body.price);
+      const numKw = Number(body.systemSizeKw);
+      const numPrice = Number(body.price);
+      if (isNaN(numKw) || isNaN(numPrice) || numKw <= 0 || numPrice <= 0) {
+        return NextResponse.json({ error: "Invalid system size or price." }, { status: 400 });
+      }
+      const updatedPricing = await SolarDB.updatePricingRule(numKw, numPrice);
       return NextResponse.json({ success: true, pricing: updatedPricing });
     }
 
@@ -38,7 +43,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true, rule: updated });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Error updating rule";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Error updating rule:", err);
+    return NextResponse.json({ error: "Could not update rule. Please try again." }, { status: 500 });
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -8,14 +8,34 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { SolarSaathiLogo } from "@/components/SolarSaathiLogo";
 
+function getPostLoginDestination(search: string, role?: string) {
+  const requestedPath = new URLSearchParams(search).get("next");
+  const routePath = requestedPath?.split(/[?#]/, 1)[0];
+  const authRoutes = ["/login", "/signup", "/forgot-password"];
+  const safeRequestedPath = requestedPath?.startsWith("/")
+    && !requestedPath.startsWith("//")
+    && routePath
+    && !authRoutes.includes(routePath)
+    ? requestedPath
+    : null;
+  return safeRequestedPath || (role === "HOMEOWNER" ? "/" : "/admin");
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const checkedInitialSession = useRef(false);
+
+  useEffect(() => {
+    if (isLoading || checkedInitialSession.current) return;
+    checkedInitialSession.current = true;
+    if (user) router.replace(getPostLoginDestination(window.location.search, user.role));
+  }, [isLoading, router, user]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -28,10 +48,18 @@ export default function LoginPage() {
     }
     const response = await fetch("/api/auth/session", { cache: "no-store" });
     const data = await response.json();
-    const requestedPath = new URLSearchParams(window.location.search).get("next");
-    const safeRequestedPath = requestedPath?.startsWith("/") && !requestedPath.startsWith("//") ? requestedPath : null;
-    router.push(safeRequestedPath || (data.user?.role === "HOMEOWNER" ? "/" : "/admin"));
+    router.push(getPostLoginDestination(window.location.search, data.user?.role));
   };
+
+  if (isLoading || user) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-slate-100 px-4 dark:bg-slate-950">
+        <p role="status" className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+          {isLoading ? "Checking your account…" : "You’re already signed in. Redirecting…"}
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-100 p-4 dark:bg-slate-950 sm:p-8">

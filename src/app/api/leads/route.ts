@@ -9,8 +9,8 @@ export async function GET() {
     const leads = await SolarDB.getLeads();
     return NextResponse.json({ success: true, leads });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to fetch leads";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Failed to fetch leads:", err);
+    return NextResponse.json({ error: "Failed to fetch leads. Please try again." }, { status: 500 });
   }
 }
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, lead: newLead }, { status: 201 });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to create lead";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Failed to create lead:", err);
+    return NextResponse.json({ error: "Failed to create lead. Please try again." }, { status: 500 });
   }
 }

@@ -21,6 +21,7 @@
 - [x] Semgrep SAST scanner & MCP server configured (`semgrep mcp -t stdio`).
 - [x] SonarQube Scanner (`sonarqube-scanner` v3.1.0) & `sonar-project.properties` configured with `sonarqube-api-mcp`.
 - [x] GitGuardian CLI (`ggshield` v1.56.1) installed with automated Git pre-commit hook & native GitGuardian MCP server.
+- [x] CodeRabbit thorough audit completed: all Critical, Major, and Minor findings resolved (in-memory dual fallback, sample lead access, Gemini OCR model names, rate limiting, and direct test imports).
 
 ---
 

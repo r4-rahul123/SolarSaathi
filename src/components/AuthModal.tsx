@@ -32,6 +32,7 @@ export function AuthModal() {
         {/* Close Button */}
         <button
           onClick={() => setIsAuthModalOpen(false)}
+          aria-label="Close modal"
           className="absolute right-4 top-4 z-20 p-2 rounded-full bg-slate-100/80 dark:bg-slate-800/80 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />

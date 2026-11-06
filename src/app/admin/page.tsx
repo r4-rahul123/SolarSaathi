@@ -43,9 +43,9 @@ export default function AdminDashboardPage() {
 
   // Editable pricing rules
   const [editingPricing, setEditingPricing] = useState<Record<number, number>>({
-    1: 65000,
-    2: 125000,
-    3: 180000,
+    1: 75000,
+    2: 140000,
+    3: 195000,
   });
   const [pricingSaveMsg, setPricingSaveMsg] = useState<string | null>(null);
 
@@ -103,6 +103,21 @@ export default function AdminDashboardPage() {
       active = false;
     };
   }, [isAuthLoading, router, user]);
+
+  const getNextStage = (curr: ProjectStage): ProjectStage => {
+    const ORDERED: ProjectStage[] = [
+      "LEAD_APPROVED",
+      "SITE_SURVEY",
+      "QUOTATION_APPROVED",
+      "ADVANCE_PAYMENT",
+      "INSTALLATION",
+      "NET_METERING",
+      "SUBSIDY_APPLICATION",
+      "SUBSIDY_CREDITED",
+    ];
+    const idx = ORDERED.indexOf(curr);
+    return idx >= 0 && idx < ORDERED.length - 1 ? ORDERED[idx + 1] : "SUBSIDY_CREDITED";
+  };
 
   const handleUpdateStatus = async (leadId: string, newStatus: ProjectStage, nextAction?: NextAction) => {
     try {
@@ -500,7 +515,7 @@ export default function AdminDashboardPage() {
                     <span className="px-3.5 py-2 text-xs font-medium text-slate-500">No phone number available</span>
                   )}
                   <button
-                    onClick={() => handleUpdateStatus(stk.id, "SUBSIDY_APPLICATION")}
+                    onClick={() => handleUpdateStatus(stk.id, getNextStage(stk.status))}
                     className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-xs"
                   >
                     Resolve & Advance Stage
@@ -760,6 +775,7 @@ export default function AdminDashboardPage() {
 
               <button
                 onClick={() => setSelectedLead(null)}
+                aria-label="Close details"
                 className="text-slate-400 hover:text-slate-700 dark:hover:text-white text-xl font-black cursor-pointer"
               >
                 ✕

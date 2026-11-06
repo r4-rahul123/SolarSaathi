@@ -13,7 +13,7 @@ if (!process.env.DATABASE_URL) {
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const demoUsers = [
-  { name: "Demo Customer", email: "customer@solarsaathi.demo", password: "customer123", role: "HOMEOWNER" },
+  { name: "Demo Customer", email: "customer@solarsaathi.demo", password: "solar123", role: "HOMEOWNER" },
   { name: "Demo Sales User", email: "sales@solarsaathi.demo", password: "sales123", role: "SALES" },
   { name: "Demo Surveyor", email: "surveyor@solarsaathi.demo", password: "survey123", role: "SURVEYOR" },
   { name: "Demo Admin", email: "admin@solarsaathi.demo", password: "admin123", role: "COORDINATOR" },

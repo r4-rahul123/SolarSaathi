@@ -68,7 +68,7 @@ export default function HomePage() {
         <SolarIntakeForm />
       </section>
 
-      <section className="mx-auto max-w-5xl px-4 pt-14 sm:px-6 lg:px-8">
+      <section id="how-it-works" className="mx-auto max-w-5xl scroll-mt-28 px-4 pt-14 sm:px-6 lg:px-8">
         <div className="mb-6 max-w-xl">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#198754]">{t("howItWorksEyebrow")}</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{t("howItWorksTitle")}</h2>

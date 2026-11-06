@@ -1,4 +1,4 @@
-import {
+import type {
   OccupancyType,
   ScoreBreakdown,
   SolarQuote,
@@ -6,7 +6,7 @@ import {
   SubsidyRule,
   PricingRule,
   NextAction,
-} from "@/types/solar";
+} from "../types/solar.ts";
 
 export const DEFAULT_SUBSIDY_RULE: SubsidyRule = {
   id: "PM-SURYA-GHAR-2026",
@@ -96,7 +96,7 @@ export function calculateSolarQuote(
   const option3 = buildOption(3, priceFor(3, 195000), rule, recommendedKw >= 3);
 
   return {
-    id: `QT-${Math.floor(1000 + Math.random() * 9000)}`,
+    id: `QT-${(typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10)).toUpperCase()}`,
     leadId,
     options: [option1, option2, option3],
     recommendedSizeKw: Math.min(3, Math.max(1, recommendedKw)),

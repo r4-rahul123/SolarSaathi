@@ -29,7 +29,7 @@ export async function parseElectricityBillWithAI(
       apiKey,
       httpOptions: { timeout: 20_000, retryOptions: { attempts: 1 } },
     });
-    const models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"];
+    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
     const prompt = `
 You are an expert OCR and data extractor for Indian electricity distribution utility bills (MSEDCL / Mahavitaran, Adani Electricity, Tata Power, BESCOM, etc.).
 Analyze this electricity bill image and extract the following details into a strict JSON object:
@@ -100,7 +100,7 @@ Rules:
           .replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]")
           .replace(/[\r\n]+/g, " ")
           .slice(0, 220) || "Gemini request failed.";
-        console.warn(`Bill OCR failed with ${model}:`, failureDetail);
+        console.warn("Bill OCR failed with model:", model, failureDetail);
 
         const canFallback = index < models.length - 1 && (err instanceof SyntaxError || /(?:\b503\b|\b429\b|\b500\b|\b502\b|\b504\b|UNAVAILABLE|high demand|model.*not available)/i.test(rawMessage));
         if (!canFallback) break;
