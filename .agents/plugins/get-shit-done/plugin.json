@@ -1,0 +1,7 @@
+{
+  "name": "get-shit-done",
+  "version": "1.0.0",
+  "description": "Get Shit Done (GSD): Spec-driven development, phased execution, and context engineering framework for AI coding assistants.",
+  "author": "GSD Community",
+  "repository": "https://github.com/open-gsd/gsd-core"
+}
