@@ -29,7 +29,7 @@ export async function parseElectricityBillWithAI(
       apiKey,
       httpOptions: { timeout: 20_000, retryOptions: { attempts: 1 } },
     });
-    const models = ["gemini-3.8-flash", "gemini-3.7-flash"];
+    const models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"];
     const prompt = `
 You are an expert OCR and data extractor for Indian electricity distribution utility bills (MSEDCL / Mahavitaran, Adani Electricity, Tata Power, BESCOM, etc.).
 Analyze this electricity bill image and extract the following details into a strict JSON object:

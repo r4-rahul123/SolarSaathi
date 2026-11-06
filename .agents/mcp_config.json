@@ -16,6 +16,25 @@
         "-t",
         "stdio"
       ]
+    },
+    "sonarqube": {
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "sonarqube-api-mcp"
+      ],
+      "env": {
+        "SONAR_HOST_URL": "http://localhost:9000",
+        "SONAR_TOKEN": ""
+      }
+    },
+    "gitguardian": {
+      "command": "node",
+      "args": [
+        "scripts/gitguardian-mcp.mjs"
+      ]
     }
   }
 }

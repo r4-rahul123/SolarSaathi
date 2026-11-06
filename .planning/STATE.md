@@ -17,6 +17,10 @@
 - [x] 18/18 App Router routes compiling cleanly.
 - [x] 4/4 automated test suites passing.
 - [x] Single `submission.zip` packaged with `Technical_Design_Document.docx` and `deployment.md`.
+- [x] Playwright MCP server integrated (`@playwright/mcp@latest`).
+- [x] Semgrep SAST scanner & MCP server configured (`semgrep mcp -t stdio`).
+- [x] SonarQube Scanner (`sonarqube-scanner` v3.1.0) & `sonar-project.properties` configured with `sonarqube-api-mcp`.
+- [x] GitGuardian CLI (`ggshield` v1.56.1) installed with automated Git pre-commit hook & native GitGuardian MCP server.
 
 ---
 

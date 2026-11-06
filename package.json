@@ -10,6 +10,8 @@
     "db:seed-demo": "node --env-file-if-exists=.env.local scripts/seed-demo-users.mjs",
     "test": "node --test tests/run-tests.mjs",
     "security:scan": "semgrep scan --config auto",
+    "security:secrets": "ggshield secret scan repo .",
+    "sonar:scan": "sonar-scanner",
     "lint": "eslint"
   },
   "dependencies": {
@@ -27,6 +29,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@tailwindcss/turbopack": "^4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
@@ -37,6 +40,7 @@
     "docx": "^9.15.1",
     "eslint": "^9",
     "eslint-config-next": "16.4.4",
+    "sonarqube-scanner": "^5.0.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
