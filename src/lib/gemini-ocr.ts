@@ -25,10 +25,12 @@ export async function parseElectricityBillWithAI(
   let failureDetail = "Gemini did not return readable bill fields.";
 
   if (apiKey) {
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-
-      const prompt = `
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: { timeout: 20_000, retryOptions: { attempts: 1 } },
+    });
+    const models = ["gemini-3.8-flash", "gemini-3.7-flash"];
+    const prompt = `
 You are an expert OCR and data extractor for Indian electricity distribution utility bills (MSEDCL / Mahavitaran, Adani Electricity, Tata Power, BESCOM, etc.).
 Analyze this electricity bill image and extract the following details into a strict JSON object:
 {
@@ -46,56 +48,63 @@ Rules:
 3. Keep numbers as pure numeric floats/ints.
 `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType,
-                  data: imageBase64.replace(/^data:[^;]+;base64,/, ""),
+    for (const [index, model] of models.entries()) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    mimeType,
+                    data: imageBase64.replace(/^data:[^;]+;base64,/, ""),
+                  },
                 },
-              },
-            ],
-          },
-        ],
-      });
+              ],
+            },
+          ],
+        });
 
-      const responseText = response.text?.trim() || "";
-      if (!responseText) {
-        failureDetail = "Gemini returned an empty response.";
+        const responseText = response.text?.trim() || "";
+        if (!responseText) {
+          failureDetail = `${model} returned an empty response.`;
+          continue;
+        }
+        const cleanedJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+
+        const parsed = JSON.parse(cleanedJson);
+        const validated = BillExtractionSchema.safeParse(parsed);
+
+        if (validated.success) {
+          return {
+            ...validated.data,
+            consumerNumber: validated.data.consumerNumber ?? undefined,
+            tariff: validated.data.tariff ?? undefined,
+            sanctionedLoadKw: validated.data.sanctionedLoadKw ?? undefined,
+            monthlyUnits: validated.data.monthlyUnits ?? undefined,
+            monthlyAmount: validated.data.monthlyAmount ?? undefined,
+            billingUnit: validated.data.billingUnit ?? undefined,
+            extractionNotes: "Review the values against your bill before continuing.",
+            extractedAt: new Date().toISOString(),
+          };
+        }
+        failureDetail = `${model} response fields were invalid: ${validated.error.issues.map((issue) => issue.path.join(".") || "response").join(", ")}.`;
+      } catch (err: unknown) {
+        const rawMessage = err instanceof Error ? err.message : "Gemini request failed.";
+        failureDetail = rawMessage
+          .replaceAll(apiKey, "[redacted]")
+          .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")
+          .replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]")
+          .replace(/[\r\n]+/g, " ")
+          .slice(0, 220) || "Gemini request failed.";
+        console.warn(`Bill OCR failed with ${model}:`, failureDetail);
+
+        const canFallback = index < models.length - 1 && (err instanceof SyntaxError || /(?:\b503\b|\b429\b|\b500\b|\b502\b|\b504\b|UNAVAILABLE|high demand|model.*not available)/i.test(rawMessage));
+        if (!canFallback) break;
       }
-      const cleanedJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
-
-      const parsed = JSON.parse(cleanedJson);
-      const validated = BillExtractionSchema.safeParse(parsed);
-
-      if (validated.success) {
-        return {
-          ...validated.data,
-          consumerNumber: validated.data.consumerNumber ?? undefined,
-          tariff: validated.data.tariff ?? undefined,
-          sanctionedLoadKw: validated.data.sanctionedLoadKw ?? undefined,
-          monthlyUnits: validated.data.monthlyUnits ?? undefined,
-          monthlyAmount: validated.data.monthlyAmount ?? undefined,
-          billingUnit: validated.data.billingUnit ?? undefined,
-          extractionNotes: "Review the values against your bill before continuing.",
-          extractedAt: new Date().toISOString(),
-        };
-      }
-      failureDetail = `Gemini response fields were invalid: ${validated.error.issues.map((issue) => issue.path.join(".") || "response").join(", ")}.`;
-    } catch (err: unknown) {
-      const rawMessage = err instanceof Error ? err.message : "Gemini request failed.";
-      failureDetail = rawMessage
-        .replaceAll(apiKey || "\u0000", "[redacted]")
-        .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")
-        .replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]")
-        .replace(/[\r\n]+/g, " ")
-        .slice(0, 220) || "Gemini request failed.";
-      console.warn("Bill OCR failed:", failureDetail);
     }
   }
 
