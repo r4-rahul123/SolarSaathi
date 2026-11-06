@@ -21,7 +21,8 @@ export async function parseElectricityBillWithAI(
   imageBase64: string,
   mimeType: string = "image/jpeg"
 ): Promise<BillExtraction> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  let failureDetail = "Gemini did not return readable bill fields.";
 
   if (apiKey) {
     try {
@@ -64,6 +65,9 @@ Rules:
       });
 
       const responseText = response.text?.trim() || "";
+      if (!responseText) {
+        failureDetail = "Gemini returned an empty response.";
+      }
       const cleanedJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
 
       const parsed = JSON.parse(cleanedJson);
@@ -82,8 +86,16 @@ Rules:
           extractedAt: new Date().toISOString(),
         };
       }
+      failureDetail = `Gemini response fields were invalid: ${validated.error.issues.map((issue) => issue.path.join(".") || "response").join(", ")}.`;
     } catch (err: unknown) {
-      console.warn("Bill OCR failed:", err);
+      const rawMessage = err instanceof Error ? err.message : "Gemini request failed.";
+      failureDetail = rawMessage
+        .replaceAll(apiKey || "\u0000", "[redacted]")
+        .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")
+        .replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]")
+        .replace(/[\r\n]+/g, " ")
+        .slice(0, 220) || "Gemini request failed.";
+      console.warn("Bill OCR failed:", failureDetail);
     }
   }
 
@@ -93,7 +105,7 @@ Rules:
       overall: "Unclear",
     },
     extractionNotes: apiKey
-      ? "The bill could not be read. Enter the values manually and check them against the uploaded bill."
+      ? `The bill could not be read (${failureDetail}). Check Gemini API access and try again, or enter the values manually.`
       : "Automatic bill reading is not configured. Enter the values manually and check them against the uploaded bill.",
     extractedAt: new Date().toISOString(),
   };
