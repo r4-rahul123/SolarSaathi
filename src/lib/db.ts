@@ -1,4 +1,6 @@
 import { Lead, SubsidyRule, PricingRule, ProjectStage } from "@/types/solar";
+import { getPostgresPool } from "@/lib/postgres";
+import { randomUUID } from "node:crypto";
 import {
   calculateLeadScore,
   calculateSolarQuote,
@@ -9,356 +11,57 @@ import {
 
 const INITIAL_RULES: SubsidyRule[] = [DEFAULT_SUBSIDY_RULE];
 const INITIAL_PRICING: PricingRule[] = DEFAULT_PRICING_RULES;
+const BUILT_IN_SAMPLE_LEAD_IDS = new Set(["LD-30881", "LD-30902", "LD-30915", "PR-1025", "PR-1026"]);
 
-const INITIAL_LEADS: Lead[] = [
-  {
-    id: "LD-30881",
-    name: "Prashant Wankhede",
-    phone: "+91 98231 44521",
-    email: "prashant.w@gmail.com",
-    address: "Plot 42, Wardha Road, Somalwada",
-    pincode: "440015",
-    city: "Nagpur",
-    occupancy: "Owner",
-    roofType: "Concrete Flat",
-    roofAreaSqFt: 650,
-    monthlyBill: 3200,
-    avgUnitsPerMonth: 340,
-    recommendedKw: 3,
-    scoreBreakdown: {
-      ownershipPoints: 25,
-      billPoints: 25,
-      roofAreaPoints: 20,
-      consumptionPoints: 20,
-      serviceabilityPoints: 10,
-      totalScore: 100,
-      tier: "High",
-      explanation: "High Priority Score (100/100). Verified owner with high consumption (340 kWh/mo). Immediate site survey approved.",
-    },
-    status: "SITE_SURVEY",
-    nextAction: "SITE_VISIT",
-    billExtraction: {
-      consumerNumber: "410019283741",
-      tariff: "LT-I (Residential Single Phase)",
-      sanctionedLoadKw: 4.0,
-      monthlyUnits: 340,
-      monthlyAmount: 3200,
-      billingUnit: "Nagpur Urban BU-41",
-      confidence: {
-        consumerNumber: 0.98,
-        tariff: 0.95,
-        sanctionedLoadKw: 0.91,
-        monthlyUnits: 0.88,
-        overall: "High",
-      },
-      extractionNotes: "MSEDCL bill verified. Matched consumer address and sanctioned load.",
-      extractedAt: "2026-11-01T10:16:30Z",
-    },
-    quote: calculateSolarQuote("LD-30881", 3),
-    timeline: [
-      {
-        stage: "LEAD_APPROVED",
-        title: "1. Lead & Bill Approved",
-        description: "MSEDCL Bill #410019283741 verified via Gemini Vision OCR.",
-        completedAt: "2026-11-01T10:15:00Z",
-      },
-      {
-        stage: "SITE_SURVEY",
-        title: "2. Rooftop Site Survey",
-        description: "Senior Solar Engineer assigned for shadow-free area measurement.",
-        completedAt: "2026-11-02T14:00:00Z",
-        isCurrent: true,
-      },
-      {
-        stage: "QUOTATION_APPROVED",
-        title: "3. Quotation Approved",
-        description: "3 kW System selected with ₹78,000 PM Surya Ghar Subsidy.",
-      },
-      {
-        stage: "ADVANCE_PAYMENT",
-        title: "4. Advance Token Payment",
-        description: "10% installation advance recorded via mock payment gateway.",
-      },
-      {
-        stage: "INSTALLATION",
-        title: "5. Solar Panel Mounting",
-        description: "Tier-1 Mono PERC panels & BIS-certified on-grid inverter mounting.",
-      },
-      {
-        stage: "NET_METERING",
-        title: "6. MSEDCL Bi-directional Net Meter",
-        description: "Grid synchronization and DISCOM testing.",
-      },
-      {
-        stage: "SUBSIDY_APPLICATION",
-        title: "7. National Portal DBT Filing",
-        description: "Commissioning report uploaded to central subsidy portal.",
-      },
-      {
-        stage: "SUBSIDY_CREDITED",
-        title: "8. ₹78,000 DBT Credited",
-        description: "Subsidy amount transferred directly into consumer's bank account.",
-      },
-    ],
-    notifications: [
-      {
-        id: "nt-1",
-        channel: "WhatsApp",
-        recipient: "+91 98231 44521",
-        message: "Namaskar Prashant ji, your 3 kW SolarSaathi quote (Ref: LD-30881) with ₹78,000 PM subsidy is ready. Track here: solarsaathi.app/track/LD-30881",
-        sentAt: "2026-11-01T10:18:00Z",
-        status: "READ",
-      },
-    ],
-    assignedStaff: "Sunil Deshpande",
-    lastUpdatedDaysAgo: 1,
-    isStuck: false,
-    createdAt: "2026-11-01T10:15:00Z",
-    updatedAt: "2026-11-02T14:00:00Z",
-  },
-  {
-    id: "LD-30902",
-    name: "Rohit Meshram",
-    phone: "+91 97654 32189",
-    email: "rohit.meshram@yahoo.com",
-    address: "Flat 301, Manish Nagar",
-    pincode: "440025",
-    city: "Nagpur",
-    occupancy: "Tenant",
-    roofType: "Concrete Flat",
-    roofAreaSqFt: 400,
-    monthlyBill: 1900,
-    avgUnitsPerMonth: 210,
-    recommendedKw: 2,
-    scoreBreakdown: {
-      ownershipPoints: 5,
-      billPoints: 20,
-      roofAreaPoints: 14,
-      consumptionPoints: 14,
-      serviceabilityPoints: 10,
-      totalScore: 63,
-      tier: "Low",
-      explanation: "Tenant lead. Rooftop property rights belong to landlord. Physical survey replaced with a 5-minute phone call to avoid wasting ₹2,500 survey cost.",
-    },
-    status: "LEAD_APPROVED",
-    nextAction: "SHORT_CALL",
-    billExtraction: {
-      consumerNumber: "410087654120",
-      tariff: "LT-I (Residential)",
-      sanctionedLoadKw: 2.0,
-      monthlyUnits: 210,
-      monthlyAmount: 1900,
-      billingUnit: "Nagpur South",
-      confidence: {
-        consumerNumber: 0.98,
-        tariff: 0.95,
-        sanctionedLoadKw: 0.91,
-        monthlyUnits: 0.88,
-        overall: "High",
-      },
-      extractionNotes: "Bill parsed successfully. Tenant occupancy flagged.",
-      extractedAt: "2026-11-02T11:21:00Z",
-    },
-    quote: calculateSolarQuote("LD-30902", 2),
-    timeline: [
-      {
-        stage: "LEAD_APPROVED",
-        title: "1. Lead & Bill Approved",
-        description: "Assigned to Tele-Advisory Desk for landlord consent consultation.",
-        completedAt: "2026-11-02T11:20:00Z",
-        isCurrent: true,
-      },
-    ],
-    notifications: [
-      {
-        id: "nt-2",
-        channel: "SMS",
-        recipient: "+91 97654 32189",
-        message: "Hello Rohit, SolarSaathi advisory desk has received your inquiry. Our consultant will call you to discuss landlord NOC requirements.",
-        sentAt: "2026-11-02T11:22:00Z",
-        status: "DELIVERED",
-      },
-    ],
-    assignedStaff: "Sunil Deshpande",
-    lastUpdatedDaysAgo: 2,
-    isStuck: false,
-    createdAt: "2026-11-02T11:20:00Z",
-    updatedAt: "2026-11-02T11:21:00Z",
-  },
-  {
-    id: "LD-30915",
-    name: "Ayesha Siddiqui",
-    phone: "+91 94228 11902",
-    address: "House 12, Gittikhadan, Katol Road",
-    pincode: "440013",
-    city: "Nagpur",
-    occupancy: "Owner",
-    roofType: "Tin Shed",
-    roofAreaSqFt: 300,
-    monthlyBill: 650,
-    avgUnitsPerMonth: 85,
-    recommendedKw: 1,
-    scoreBreakdown: {
-      ownershipPoints: 25,
-      billPoints: 5,
-      roofAreaPoints: 14,
-      consumptionPoints: 4,
-      serviceabilityPoints: 10,
-      totalScore: 58,
-      tier: "Low",
-      explanation: "Small bill (<₹800/mo). Payback period is too long to justify ₹2,500 site visit. Queued for phone consultation instead.",
-    },
-    status: "LEAD_APPROVED",
-    nextAction: "SHORT_CALL",
-    billExtraction: {
-      consumerNumber: "410055214981",
-      tariff: "LT-I (Residential)",
-      sanctionedLoadKw: 1.0,
-      monthlyUnits: 85,
-      monthlyAmount: 650,
-      billingUnit: "Nagpur West",
-      confidence: {
-        consumerNumber: 0.98,
-        tariff: 0.95,
-        sanctionedLoadKw: 0.91,
-        monthlyUnits: 0.88,
-        overall: "High",
-      },
-      extractionNotes: "Bill verified. Low monthly units noted.",
-      extractedAt: "2026-11-02T15:46:00Z",
-    },
-    quote: calculateSolarQuote("LD-30915", 1),
-    timeline: [
-      {
-        stage: "LEAD_APPROVED",
-        title: "1. Lead Evaluated",
-        description: "Small residential rooftop inquiry. Diverted to phone consultation.",
-        completedAt: "2026-11-02T15:45:00Z",
-        isCurrent: true,
-      },
-    ],
-    notifications: [],
-    assignedStaff: "Sunil Deshpande",
-    lastUpdatedDaysAgo: 3,
-    isStuck: false,
-    createdAt: "2026-11-02T15:45:00Z",
-    updatedAt: "2026-11-02T15:46:00Z",
-  },
-  {
-    id: "PR-1025",
-    name: "Dr. Rajesh Deshmukh",
-    phone: "+91 98222 77110",
-    email: "dr.deshmukh@gmail.com",
-    address: "Bunglow 9, Ramdaspeth",
-    pincode: "440010",
-    city: "Nagpur",
-    occupancy: "Owner",
-    roofType: "Concrete Flat",
-    roofAreaSqFt: 1200,
-    monthlyBill: 5800,
-    avgUnitsPerMonth: 610,
-    recommendedKw: 3,
-    scoreBreakdown: {
-      ownershipPoints: 25,
-      billPoints: 25,
-      roofAreaPoints: 20,
-      consumptionPoints: 20,
-      serviceabilityPoints: 10,
-      totalScore: 100,
-      tier: "High",
-      explanation: "Priority High-Capacity Installation.",
-    },
-    status: "NET_METERING",
-    nextAction: "INSTALL_METER",
-    quote: calculateSolarQuote("PR-1025", 3),
-    timeline: [
-      { stage: "LEAD_APPROVED", title: "1. Lead Approved", completedAt: "2026-10-10T09:00:00Z", description: "Verified." },
-      { stage: "SITE_SURVEY", title: "2. Site Survey Approved", completedAt: "2026-10-12T16:00:00Z", description: "Concrete slab OK." },
-      { stage: "QUOTATION_APPROVED", title: "3. Quotation Accepted", completedAt: "2026-10-14T11:00:00Z", description: "3 kW selected." },
-      { stage: "ADVANCE_PAYMENT", title: "4. Advance Received", completedAt: "2026-10-15T15:00:00Z", description: "₹19,500 token paid." },
-      { stage: "INSTALLATION", title: "5. Installation Completed", completedAt: "2026-10-22T12:00:00Z", description: "Panels mounted." },
-      { stage: "NET_METERING", title: "6. MSEDCL Net Metering", description: "Awaiting DISCOM inspector test bench approval.", isCurrent: true },
-    ],
-    notifications: [
-      {
-        id: "nt-3",
-        channel: "WhatsApp",
-        recipient: "+91 98222 77110",
-        message: "Update for PR-1025: Net-metering application submitted to MSEDCL Nagpur Urban circle.",
-        sentAt: "2026-10-25T11:00:00Z",
-        status: "READ",
-      },
-    ],
-    assignedStaff: "Amit Verma",
-    lastUpdatedDaysAgo: 10,
-    isStuck: true, // Flagged because no update in 10 days (>7 days threshold)
-    createdAt: "2026-10-10T09:00:00Z",
-    updatedAt: "2026-10-25T11:00:00Z",
-  },
-  {
-    id: "PR-1026",
-    name: "Sunita Patil",
-    phone: "+91 98230 55412",
-    address: "Plot 18, Pratap Nagar",
-    pincode: "440022",
-    city: "Nagpur",
-    occupancy: "Owner",
-    roofType: "Concrete Flat",
-    roofAreaSqFt: 700,
-    monthlyBill: 3400,
-    avgUnitsPerMonth: 360,
-    recommendedKw: 3,
-    scoreBreakdown: {
-      ownershipPoints: 25,
-      billPoints: 25,
-      roofAreaPoints: 20,
-      consumptionPoints: 20,
-      serviceabilityPoints: 10,
-      totalScore: 100,
-      tier: "High",
-      explanation: "Full turnkey installation.",
-    },
-    status: "SUBSIDY_APPLICATION",
-    nextAction: "VERIFY_DOCS",
-    quote: calculateSolarQuote("PR-1026", 3),
-    timeline: [
-      { stage: "LEAD_APPROVED", title: "1. Lead Approved", completedAt: "2026-10-01T09:00:00Z", description: "Verified." },
-      { stage: "INSTALLATION", title: "5. Installation Done", completedAt: "2026-10-12T16:00:00Z", description: "Done." },
-      { stage: "NET_METERING", title: "6. Meter Live", completedAt: "2026-10-18T10:00:00Z", description: "Commissioned." },
-      { stage: "SUBSIDY_APPLICATION", title: "7. Subsidy Claim Submitted", description: "Awaiting DBT bank clearance.", isCurrent: true },
-    ],
-    notifications: [],
-    assignedStaff: "Sunil Deshpande",
-    lastUpdatedDaysAgo: 15,
-    isStuck: true, // Flagged because no update in 15 days (>7 days threshold)
-    createdAt: "2026-10-01T09:00:00Z",
-    updatedAt: "2026-10-18T10:00:00Z",
-  },
-];
+let seedPromise: Promise<void> | null = null;
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __solarLeadsStore: Lead[] | undefined;
-  // eslint-disable-next-line no-var
-  var __solarRulesStore: SubsidyRule[] | undefined;
-  // eslint-disable-next-line no-var
-  var __solarPricingStore: PricingRule[] | undefined;
+async function ensureDefaultRules() {
+  if (!seedPromise) {
+    seedPromise = (async () => {
+      const pool = getPostgresPool();
+      for (const rule of INITIAL_RULES) {
+        await pool.query(
+          "INSERT INTO solar_rules (id, kind, data) VALUES ($1, 'subsidy', $2::jsonb) ON CONFLICT (id) DO NOTHING",
+          [rule.id, JSON.stringify(rule)],
+        );
+      }
+      for (const rule of INITIAL_PRICING) {
+        await pool.query(
+          "INSERT INTO solar_rules (id, kind, data) VALUES ($1, 'pricing', $2::jsonb) ON CONFLICT (id) DO NOTHING",
+          [`pricing-${rule.systemSizeKw}`, JSON.stringify(rule)],
+        );
+      }
+    })().catch((error) => {
+      seedPromise = null;
+      throw error;
+    });
+  }
+  await seedPromise;
 }
 
-globalThis.__solarLeadsStore = globalThis.__solarLeadsStore || INITIAL_LEADS;
-globalThis.__solarRulesStore = globalThis.__solarRulesStore || INITIAL_RULES;
-globalThis.__solarPricingStore = globalThis.__solarPricingStore || INITIAL_PRICING;
-
 export class SolarDB {
-  static getLeads(): Lead[] {
-    return globalThis.__solarLeadsStore || [];
+  static async getLeads(): Promise<Lead[]> {
+    await ensureDefaultRules();
+    const { rows } = await getPostgresPool().query<{ data: Lead }>("SELECT data FROM solar_leads ORDER BY created_at DESC");
+    return rows.map((row) => row.data).filter((lead) => !BUILT_IN_SAMPLE_LEAD_IDS.has(lead.id.toUpperCase()));
   }
 
-  static getLeadById(id: string): Lead | undefined {
-    return (globalThis.__solarLeadsStore || []).find((l) => l.id.toLowerCase() === id.toLowerCase());
+  static async getLeadsByOwner(ownerUserId: string): Promise<Lead[]> {
+    const { rows } = await getPostgresPool().query<{ data: Lead }>(
+      "SELECT data FROM solar_leads WHERE data->>'ownerUserId' = $1 ORDER BY created_at DESC",
+      [ownerUserId],
+    );
+    return rows.map((row) => row.data);
   }
 
-  static createLead(
+  static async getLeadById(id: string): Promise<Lead | undefined> {
+    await ensureDefaultRules();
+    if (BUILT_IN_SAMPLE_LEAD_IDS.has(id.toUpperCase())) return undefined;
+    const { rows } = await getPostgresPool().query<{ data: Lead }>("SELECT data FROM solar_leads WHERE LOWER(id) = LOWER($1)", [id]);
+    return rows[0]?.data;
+  }
+
+  static async createLead(
     leadData: Omit<
       Lead,
       | "id"
@@ -373,10 +76,15 @@ export class SolarDB {
       | "updatedAt"
       | "status"
       | "nextAction"
-    >
-  ): Lead {
-    const rules = this.getSubsidyRules();
-    const activeRule = rules.find((r) => r.isActive) || DEFAULT_SUBSIDY_RULE;
+    >,
+    saveToDatabase = true,
+  ): Promise<Lead> {
+    await ensureDefaultRules();
+    const rules = await this.getSubsidyRules();
+    const today = new Date().toISOString().slice(0, 10);
+    const activeRule = rules
+      .filter((r) => r.isActive && r.effectiveFrom <= today && (!r.effectiveTo || r.effectiveTo >= today))
+      .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0] || DEFAULT_SUBSIDY_RULE;
 
     const recommendedKw = recommendSystemSize(leadData.avgUnitsPerMonth, activeRule);
     const scoreResult = calculateLeadScore(
@@ -387,10 +95,16 @@ export class SolarDB {
       leadData.pincode
     );
 
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const newId = `PROJECT-${randomSuffix}`;
+    const newId = `PROJECT-${randomUUID()}`;
 
-    const quote = calculateSolarQuote(newId, recommendedKw, activeRule);
+    const activePricing = (await this.getPricingRules())
+      .filter((rule) => rule.isActive && rule.effectiveFrom <= today)
+      .reduce((latest, rule) => {
+        const existing = latest.get(rule.systemSizeKw);
+        if (!existing || rule.effectiveFrom > existing.effectiveFrom) latest.set(rule.systemSizeKw, rule);
+        return latest;
+      }, new Map<number, PricingRule>());
+    const quote = calculateSolarQuote(newId, recommendedKw, activeRule, [...activePricing.values()]);
 
     const newLead: Lead = {
       ...leadData,
@@ -405,93 +119,66 @@ export class SolarDB {
       timeline: [
         {
           stage: "LEAD_APPROVED",
-          title: "1. Lead & Bill Received",
-          description: "Verified via SolarSaathi AI Intake.",
+          title: "1. Enquiry received",
+          description: "Your details and electricity bill have been received. Our team will review them.",
           completedAt: new Date().toISOString(),
-          isCurrent: scoreResult.breakdown.tier !== "High",
-        },
-        ...(scoreResult.breakdown.tier === "High"
-          ? [
-              {
-                stage: "SITE_SURVEY" as const,
-                title: "2. Site Survey Scheduled",
-                description: "Assigned for rooftop shadow analysis.",
-                completedAt: new Date().toISOString(),
-                isCurrent: true,
-              },
-            ]
-          : []),
-      ],
-      notifications: [
-        {
-          id: `nt-${Date.now()}`,
-          channel: "WhatsApp",
-          recipient: leadData.phone,
-          message: `Namaskar ${leadData.name}, your solar quotation (Ref: ${newId}) is ready. Track anytime: solarsaathi.app/track/${newId}`,
-          sentAt: new Date().toISOString(),
-          status: "DELIVERED",
+          isCurrent: true,
         },
       ],
-      assignedStaff: "Sunil Deshpande",
+      notifications: [],
+      assignedStaff: "Not assigned",
       lastUpdatedDaysAgo: 0,
       isStuck: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    globalThis.__solarLeadsStore = [newLead, ...(globalThis.__solarLeadsStore || [])];
-    return newLead;
+    if (!saveToDatabase) return newLead;
+
+    const persistedLead = { ...newLead, billImageBase64: undefined };
+    await getPostgresPool().query(
+      "INSERT INTO solar_leads (id, data) VALUES ($1, $2::jsonb)",
+      [newLead.id, JSON.stringify(persistedLead)],
+    );
+    return persistedLead;
   }
 
-  static updateLead(id: string, updates: Partial<Lead>): Lead | null {
-    const leads = globalThis.__solarLeadsStore || [];
-    const index = leads.findIndex((l) => l.id.toLowerCase() === id.toLowerCase());
-    if (index === -1) return null;
-
-    const existing = leads[index];
-    const newStatus = updates.status || existing.status;
-
+  static async updateLead(id: string, updates: Partial<Lead>): Promise<Lead | null> {
+    const existing = await this.getLeadById(id);
+    if (!existing) return null;
     // Define 8 canonical stages with descriptive titles
-    const STAGE_METADATA: Record<ProjectStage, { title: string; description: string; msg: string }> = {
+    const STAGE_METADATA: Record<ProjectStage, { title: string; description: string }> = {
       LEAD_APPROVED: {
         title: "1. Lead & Bill Approved",
-        description: "MSEDCL Bill verified via Gemini Vision OCR & roof feasibility evaluated.",
-        msg: "Lead & MSEDCL bill verified. Immediate feasibility confirmed.",
+        description: "Lead details received; bill values and roof feasibility need confirmation.",
       },
       SITE_SURVEY: {
         title: "2. Rooftop Site Survey",
-        description: "Certified solar engineer assigned for physical shadow-free area measurement.",
-        msg: "Site surveyor assigned to inspect your rooftop structure and shadow clearance.",
+        description: "A site survey is the next step; date and roof conditions need confirmation.",
       },
       QUOTATION_APPROVED: {
         title: "3. Quotation Approved",
-        description: "System size selected and ₹78,000 central subsidy reserved under dated rule.",
-        msg: "Quotation approved! 3 kW rooftop solar plant locked with ₹78,000 subsidy reservation.",
+        description: "The estimate was accepted. Final system size and subsidy eligibility need confirmation.",
       },
       ADVANCE_PAYMENT: {
         title: "4. Advance Token Payment",
-        description: "10% installation advance recorded via mock payment gateway.",
-        msg: "10% Advance payment received. Equipment procurement dispatched from Nagpur warehouse.",
+        description: "Payment details will be updated by the project team after confirmation.",
       },
       INSTALLATION: {
         title: "5. Solar Panel Mounting",
-        description: "Tier-1 Mono PERC panels & BIS-certified on-grid inverter mounting completed.",
-        msg: "Solar panel mounting and on-grid inverter wiring completed at your rooftop.",
+        description: "Installation progress will be updated by the project team.",
       },
       NET_METERING: {
-        title: "6. MSEDCL Bi-directional Net Meter",
-        description: "Grid synchronization and DISCOM inspector testing approved.",
-        msg: "MSEDCL bi-directional net-meter installed. Clean solar power is now feeding into the Nagpur grid!",
+        title: "6. Net metering status",
+        description: "Net metering progress will be updated by the project team.",
       },
       SUBSIDY_APPLICATION: {
         title: "7. National Portal DBT Filing",
-        description: "Joint commissioning report uploaded to central PM Surya Ghar portal.",
-        msg: "National Portal DBT subsidy claim filed with MSEDCL commissioning report.",
+        description: "Subsidy application progress will be updated by the project team.",
       },
       SUBSIDY_CREDITED: {
-        title: "8. ₹78,000 DBT Credited",
-        description: "Direct Benefit Transfer successfully credited into consumer's bank account.",
-        msg: "Congratulations! ₹78,000 direct subsidy credited into your bank account. SolarSaathi project complete!",
+        title: "8. Subsidy status updated",
+        description: "Subsidy credit status will be updated after confirmation.",
       },
     };
 
@@ -507,8 +194,6 @@ export class SolarDB {
     ];
 
     let newTimeline = existing.timeline || [];
-    let newNotifications = existing.notifications || [];
-
     if (updates.status && updates.status !== existing.status) {
       const targetIdx = ORDERED_STAGES.indexOf(updates.status);
 
@@ -526,64 +211,61 @@ export class SolarDB {
         };
       });
 
-      const meta = STAGE_METADATA[updates.status];
-      newNotifications = [
-        ...newNotifications,
-        {
-          id: `nt-${Date.now()}`,
-          channel: "WhatsApp",
-          recipient: existing.phone,
-          message: `Namaskar ${existing.name}! Update for Ref #${existing.id}: ${meta.msg} Track live: solarsaathi.app/track/${existing.id}`,
-          sentAt: new Date().toISOString(),
-          status: "DELIVERED",
-        },
-      ];
     }
 
     const updated: Lead = {
       ...existing,
       ...updates,
       timeline: updates.timeline || newTimeline,
-      notifications: updates.notifications || newNotifications,
+      notifications: updates.notifications || existing.notifications || [],
       lastUpdatedDaysAgo: 0,
       isStuck: false,
       updatedAt: new Date().toISOString(),
     };
 
-    leads[index] = updated;
-    globalThis.__solarLeadsStore = leads;
+    await getPostgresPool().query(
+      "UPDATE solar_leads SET data = $2::jsonb, updated_at = NOW() WHERE LOWER(id) = LOWER($1)",
+      [id, JSON.stringify(updated)],
+    );
     return updated;
   }
 
-  static getSubsidyRules(): SubsidyRule[] {
-    return globalThis.__solarRulesStore || INITIAL_RULES;
+  static async getSubsidyRules(): Promise<SubsidyRule[]> {
+    await ensureDefaultRules();
+    const { rows } = await getPostgresPool().query<{ data: SubsidyRule }>("SELECT data FROM solar_rules WHERE kind = 'subsidy' ORDER BY updated_at DESC");
+    return rows.map((row) => row.data);
   }
 
-  static updateSubsidyRule(ruleId: string, updates: Partial<SubsidyRule>): SubsidyRule | null {
-    const rules = globalThis.__solarRulesStore || INITIAL_RULES;
-    const index = rules.findIndex((r) => r.id === ruleId);
-    if (index === -1) return null;
-
+  static async updateSubsidyRule(ruleId: string, updates: Partial<SubsidyRule>): Promise<SubsidyRule | null> {
+    const rules = await this.getSubsidyRules();
+    const existing = rules.find((rule) => rule.id === ruleId);
+    if (!existing) return null;
     const updated = {
-      ...rules[index],
+      ...existing,
       ...updates,
     };
-    rules[index] = updated;
-    globalThis.__solarRulesStore = rules;
+    await getPostgresPool().query(
+      "UPDATE solar_rules SET data = $2::jsonb, updated_at = NOW() WHERE id = $1 AND kind = 'subsidy'",
+      [ruleId, JSON.stringify(updated)],
+    );
     return updated;
   }
 
-  static getPricingRules(): PricingRule[] {
-    return globalThis.__solarPricingStore || INITIAL_PRICING;
+  static async getPricingRules(): Promise<PricingRule[]> {
+    await ensureDefaultRules();
+    const { rows } = await getPostgresPool().query<{ data: PricingRule }>("SELECT data FROM solar_rules WHERE kind = 'pricing' ORDER BY updated_at DESC");
+    return rows.map((row) => row.data);
   }
 
-  static updatePricingRule(kw: number, price: number): PricingRule | null {
-    const pricing = globalThis.__solarPricingStore || INITIAL_PRICING;
-    const index = pricing.findIndex((p) => p.systemSizeKw === kw);
-    if (index === -1) return null;
-
-    pricing[index] = { ...pricing[index], price, effectiveFrom: new Date().toISOString().split("T")[0] };
-    globalThis.__solarPricingStore = pricing;
-    return pricing[index];
+  static async updatePricingRule(kw: number, price: number): Promise<PricingRule | null> {
+    const pricing = await this.getPricingRules();
+    const existing = pricing.find((rule) => rule.systemSizeKw === kw);
+    if (!existing) return null;
+    const updated = { ...existing, price, effectiveFrom: new Date().toISOString().split("T")[0] };
+    await getPostgresPool().query(
+      "UPDATE solar_rules SET data = $2::jsonb, updated_at = NOW() WHERE id = $1 AND kind = 'pricing'",
+      [`pricing-${kw}`, JSON.stringify(updated)],
+    );
+    return updated;
   }
 }

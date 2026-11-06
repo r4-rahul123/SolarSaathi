@@ -3,42 +3,25 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
-  Sun,
-  Moon,
+  Contrast,
   ShieldCheck,
   MapPin,
-  PhoneCall,
-  User,
   LogOut,
   ChevronDown,
-  Sparkles,
   Languages,
+  FolderKanban,
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
-import { useAuth, UserRole } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { SolarSaathiLogo } from "@/components/SolarSaathiLogo";
 
 export function Navbar() {
-  const { theme, toggleTheme } = useTheme();
-  const { user, logout, setIsAuthModalOpen, quickLogin } = useAuth();
+  const { toggleTheme } = useTheme();
+  const { user, logout, setIsAuthModalOpen } = useAuth();
   const { lang, setLang, t } = useLanguage();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
-
-  const getRoleBadge = (role: UserRole) => {
-    switch (role) {
-      case "HOMEOWNER":
-        return { label: "Homeowner", bg: "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300" };
-      case "SALES":
-        return { label: "Sales Desk", bg: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300" };
-      case "SURVEYOR":
-        return { label: "Surveyor", bg: "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300" };
-      case "COORDINATOR":
-        return { label: "Coordinator (Admin)", bg: "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300" };
-    }
-  };
-
-  const badge = user ? getRoleBadge(user.role) : null;
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#06150F]/90 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 transition-colors">
@@ -46,9 +29,7 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo & Brand */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#123D2B] to-[#198754] flex items-center justify-center text-white shadow-md shadow-emerald-900/20 group-hover:scale-105 transition-all">
-              <Sun className="w-6 h-6 text-amber-400 animate-[spin_16s_linear_infinite]" />
-            </div>
+            <span className="transition-transform group-hover:scale-105"><SolarSaathiLogo size="md" /></span>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-lg text-[#123D2B] dark:text-emerald-400 tracking-tight">
@@ -73,21 +54,31 @@ export function Navbar() {
             >
               {t("getQuote")}
             </Link>
-            <Link
-              href="/track/LD-30881"
-              className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-[#123D2B] dark:hover:text-emerald-400 px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors hidden sm:inline-block"
-            >
-              {t("trackProject")}
-            </Link>
+            {user?.role === "HOMEOWNER" ? (
+              <Link
+                href="/track"
+                className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-[#123D2B] dark:hover:text-emerald-400 px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors hidden sm:inline-block"
+              >
+                {t("trackProject")}
+              </Link>
+            ) : !user ? (
+              <Link
+                href="/login?next=%2Ftrack"
+                className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-[#123D2B] dark:hover:text-emerald-400 px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors hidden sm:inline-block"
+              >
+                {t("trackProject")}
+              </Link>
+            ) : null}
 
-            {/* Staff CRM Link */}
-            <Link
-              href="/admin"
-              className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white bg-[#123D2B] hover:bg-[#198754] dark:bg-[#198754] dark:hover:bg-emerald-500 px-3.5 py-1.5 rounded-xl transition-all shadow-xs"
-            >
-              <ShieldCheck className="w-4 h-4 text-emerald-300" />
-              <span>{t("staffCrm")}</span>
-            </Link>
+            {user && user.role !== "HOMEOWNER" && (
+              <Link
+                href="/admin"
+                className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white bg-[#123D2B] hover:bg-[#198754] dark:bg-[#198754] dark:hover:bg-emerald-500 px-3.5 py-1.5 rounded-xl transition-all shadow-xs"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                <span>{t("staffCrm")}</span>
+              </Link>
+            )}
 
             {/* LANGUAGE SWITCHER DROPDOWN */}
             <div className="relative">
@@ -155,11 +146,6 @@ export function Navbar() {
                     {user.name.charAt(0)}
                   </div>
                   <span className="hidden sm:inline max-w-[120px] truncate">{user.name}</span>
-                  {badge && (
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md ${badge.bg}`}>
-                      {badge.label}
-                    </span>
-                  )}
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
 
@@ -171,71 +157,19 @@ export function Navbar() {
                         {user.name}
                       </div>
                       <div className="text-[11px] text-slate-400 font-mono truncate">{user.email}</div>
-                      <div className="mt-1.5">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${badge?.bg}`}>
-                          Role: {badge?.label}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-1 space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 px-2 py-1 block">
-                        Switch Demo Role:
-                      </span>
-                      <button
-                        onClick={() => {
-                          quickLogin("HOMEOWNER");
-                          setIsDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between cursor-pointer"
-                      >
-                        <span>🏠 Homeowner</span>
-                        {user.role === "HOMEOWNER" && <span className="text-emerald-500 font-bold">✓</span>}
-                      </button>
-                      <button
-                        onClick={() => {
-                          quickLogin("SALES");
-                          setIsDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between cursor-pointer"
-                      >
-                        <span>📞 Sales Lead Desk</span>
-                        {user.role === "SALES" && <span className="text-emerald-500 font-bold">✓</span>}
-                      </button>
-                      <button
-                        onClick={() => {
-                          quickLogin("SURVEYOR");
-                          setIsDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between cursor-pointer"
-                      >
-                        <span>🛠️ Site Surveyor</span>
-                        {user.role === "SURVEYOR" && <span className="text-emerald-500 font-bold">✓</span>}
-                      </button>
-                      <button
-                        onClick={() => {
-                          quickLogin("COORDINATOR");
-                          setIsDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-between cursor-pointer"
-                      >
-                        <span>📋 Admin / Coordinator</span>
-                        {user.role === "COORDINATOR" && <span className="text-emerald-500 font-bold">✓</span>}
-                      </button>
                     </div>
 
                     <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
-                      <button
-                        onClick={() => {
-                          setIsAuthModalOpen(true);
-                          setIsDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-[#198754] dark:text-emerald-400 font-bold flex items-center gap-2 cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Open Auth Portal</span>
-                      </button>
-
+                      {user.role === "HOMEOWNER" && (
+                        <Link
+                          href="/track"
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="w-full rounded-lg px-2 py-1.5 text-left font-bold text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 flex items-center gap-2"
+                        >
+                          <FolderKanban className="h-3.5 w-3.5" />
+                          <span>My Projects</span>
+                        </Link>
+                      )}
                       <button
                         onClick={() => {
                           logout();
@@ -267,11 +201,7 @@ export function Navbar() {
               aria-label="Toggle Dark and Light Mode"
               className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer border border-slate-200 dark:border-slate-700 ml-1"
             >
-              {theme === "dark" ? (
-                <Sun className="w-4 h-4 animate-spin text-amber-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-slate-700" />
-              )}
+              <Contrast className="w-4 h-4" />
             </button>
           </nav>
         </div>
@@ -286,9 +216,6 @@ export function Navbar() {
           {t("pmBanner")}
         </span>
         <span className="hidden md:inline text-emerald-700">|</span>
-        <span className="hidden md:inline-flex items-center gap-1 text-amber-300 font-medium">
-          <PhoneCall className="w-3 h-3" /> Nagpur Desk: 0712-254890
-        </span>
       </div>
     </header>
   );

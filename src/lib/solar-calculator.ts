@@ -86,11 +86,14 @@ function buildOption(
 export function calculateSolarQuote(
   leadId: string,
   recommendedKw: number = 3,
-  rule: SubsidyRule = DEFAULT_SUBSIDY_RULE
+  rule: SubsidyRule = DEFAULT_SUBSIDY_RULE,
+  pricingRules: PricingRule[] = DEFAULT_PRICING_RULES
 ): SolarQuote {
-  const option1 = buildOption(1, 75000, rule, recommendedKw === 1);
-  const option2 = buildOption(2, 140000, rule, recommendedKw === 2);
-  const option3 = buildOption(3, 195000, rule, recommendedKw >= 3);
+  const priceFor = (kw: number, fallback: number) =>
+    pricingRules.find((price) => price.systemSizeKw === kw && price.isActive)?.price ?? fallback;
+  const option1 = buildOption(1, priceFor(1, 75000), rule, recommendedKw === 1);
+  const option2 = buildOption(2, priceFor(2, 140000), rule, recommendedKw === 2);
+  const option3 = buildOption(3, priceFor(3, 195000), rule, recommendedKw >= 3);
 
   return {
     id: `QT-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -165,21 +168,19 @@ export function calculateLeadScore(
   if (occupancy === "Tenant") {
     tier = "Low";
     nextAction = "SHORT_CALL";
-    explanation =
-      "Tenant lead. Rooftop property rights belong to landlord. Physical survey replaced with a 5-minute phone call to avoid wasting ₹2,500 survey cost.";
+    explanation = "A tenant enquiry is sent for a short call to confirm the property owner's interest.";
   } else if (monthlyBill < 800 || avgUnitsPerMonth < 100) {
     tier = "Low";
     nextAction = "SHORT_CALL";
-    explanation =
-      "Small bill (<₹800/mo). Payback period is too long to justify ₹2,500 site visit. Queued for phone consultation instead.";
+    explanation = "Lower electricity use is better reviewed on a call first. This score does not reject the enquiry.";
   } else if (totalScore >= 70) {
     tier = "High";
     nextAction = "SITE_VISIT";
-    explanation = `High Priority Score (${totalScore}/100). Verified owner with high consumption (${avgUnitsPerMonth} kWh/mo). Immediate site survey approved.`;
+    explanation = `Score ${totalScore}/100 based on ownership, bill, roof area, electricity use and PIN code. Suggested next step: site survey review.`;
   } else {
     tier = "Medium";
     nextAction = "SITE_VISIT";
-    explanation = `Moderate Score (${totalScore}/100). Suitable for 1-2 kW system. Standard survey queue.`;
+    explanation = `Score ${totalScore}/100 based on the details provided. Suggested next step: review the enquiry before arranging a survey.`;
   }
 
   return {

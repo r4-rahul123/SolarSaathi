@@ -51,7 +51,7 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ## 2. Reviewer Demo Login Credentials (RBAC)
 
-The application features full **Role-Based Access Control (RBAC)** across 4 roles. You can either click any of the **⚡ 1-Click Quick Demo Login** buttons inside the app navbar or modal, or log in with the following demo credentials:
+The local demo database has four seeded accounts. Sign in by entering the email and password manually:
 
 | Role | Demo Email | Password | Access & Responsibilities |
 | :--- | :--- | :--- | :--- |
@@ -60,7 +60,7 @@ The application features full **Role-Based Access Control (RBAC)** across 4 role
 | **🛠️ Site Surveyor** | `surveyor@solarsaathi.demo` | `survey123` | Scheduled rooftop site visits, shadow-free area checks, and structural feasibility approvals. |
 | **📋 Project Coordinator (Admin)** | `admin@solarsaathi.demo` | `admin123` | Full access: Stuck projects alert (>7 days), DISCOM net-metering status, milestone progression, and **Dated Subsidy Rule & Base Installation Pricing Master Editor**. |
 
-*(Tip: In the navbar, click on your profile name to open the role-switcher and switch perspectives with 1 click without re-typing passwords).*
+Public signup creates homeowner accounts. Staff roles are assigned to the seeded local demo accounts; the UI does not switch roles after sign-in.
 
 ---
 
@@ -82,7 +82,7 @@ For rapid 2-minute evaluation, pre-seeded leads and projects are included in mem
    - Public Tracker: `/track/LD-30915`.
 4. **Dr. Rajesh Deshmukh (`PR-1025`)**:
    - **Stuck Project Alert**: Delayed 10 days at MSEDCL net-metering stage (>7 days threshold).
-   - Flagged in Staff CRM Stuck Projects tab with 1-click resolve.
+   - Flagged in the Staff CRM Stuck Projects tab for staff review and status update.
    - Public Tracker: `/track/PR-1025`.
 5. **Sunita Patil (`PR-1026`)**:
    - **Stuck Project Alert**: Delayed 15 days awaiting DISCOM inspection.

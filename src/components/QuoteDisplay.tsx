@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import confetti from "canvas-confetti";
 import {
-  Sun,
+  PanelsTopLeft,
   IndianRupee,
   Calendar,
   CheckCircle2,
@@ -13,49 +12,43 @@ import {
   ArrowRight,
   ShieldCheck,
   Zap,
-  TrendingUp,
-  Award,
-  Layers,
   Check,
 } from "lucide-react";
-import { Lead, SubsidyRule, QuoteOption } from "@/types/solar";
+import { Lead } from "@/types/solar";
 import { calculateSolarQuote, DEFAULT_SUBSIDY_RULE } from "@/lib/solar-calculator";
 import { formatCurrency } from "@/lib/utils";
 import { AnimatedEnergyFlow } from "./AnimatedEnergyFlow";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 
 interface QuoteDisplayProps {
   lead: Lead;
-  initialRule?: SubsidyRule;
+  isPreview?: boolean;
+  onSaveEstimate?: () => void;
+  isSavingEstimate?: boolean;
 }
 
-export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: QuoteDisplayProps) {
+export function QuoteDisplay({ lead, isPreview = false, onSaveEstimate, isSavingEstimate = false }: QuoteDisplayProps) {
   const { t } = useLanguage();
+  const { user, setIsAuthModalOpen } = useAuth();
   const [selectedKw, setSelectedKw] = useState<number>(lead.recommendedKw || 3);
   const [copied, setCopied] = useState(false);
   const [isAccepted, setIsAccepted] = useState(lead.quote?.status === "APPROVED");
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [actionError, setActionError] = useState("");
 
-  const quote = calculateSolarQuote(lead.id, selectedKw, initialRule);
+  const quote = lead.quote || calculateSolarQuote(lead.id, lead.recommendedKw, DEFAULT_SUBSIDY_RULE);
 
-  // Trigger celebration confetti on quote generation
-  useEffect(() => {
-    try {
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.6 },
-        colors: ["#198754", "#123D2B", "#f59e0b", "#ffffff"],
-      });
-    } catch (e) {
-      // Graceful fallback
-    }
-  }, []);
-
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     const url = `${window.location.origin}/track/${lead.id}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setActionError("");
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      setActionError("Could not copy the link. You can copy it from the address bar.");
+    }
   };
 
   const handlePrint = () => {
@@ -63,16 +56,15 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
   };
 
   const handleAcceptQuote = async () => {
-    setIsAccepted(true);
-    confetti({
-      particleCount: 120,
-      spread: 80,
-      origin: { y: 0.5 },
-      colors: ["#198754", "#10b981", "#f59e0b"],
-    });
-
+    if (!user) {
+      setIsAuthModalOpen(true);
+      setActionError("Sign in to accept this estimate and keep it in your project list.");
+      return;
+    }
+    setIsAccepting(true);
+    setActionError("");
     try {
-      await fetch(`/api/leads/${lead.id}`, {
+      const response = await fetch(`/api/leads/${lead.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -80,8 +72,12 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
           recommendedKw: selectedKw,
         }),
       });
-    } catch (e) {
-      console.error(e);
+      if (!response.ok) throw new Error("Could not save your response. Please try again.");
+      setIsAccepted(true);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not save your response. Please try again.");
+    } finally {
+      setIsAccepting(false);
     }
   };
 
@@ -98,15 +94,13 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
           <div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold mb-3 border border-emerald-500/30">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>SolarSaathi Certified • PM Surya Ghar Subsidy Engine</span>
+              <span>Indicative estimate</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
-              {lead.name}&apos;s Rooftop Solar Quotation
+              {isPreview ? "Your rooftop solar estimate" : `${lead.name}'s Rooftop Solar Quotation`}
             </h2>
             <p className="text-xs sm:text-sm text-emerald-100/80 mt-1 flex flex-wrap items-center gap-2 font-medium">
-              <span>MSEDCL Consumer: <strong className="text-white font-mono">{lead.billExtraction?.consumerNumber || "410019283741"}</strong></span>
-              <span>•</span>
-              <span>Project Ref: <strong className="text-amber-400 font-mono">{lead.id}</strong></span>
+              {isPreview ? <span>Estimate preview · Sign in to save it to My Projects</span> : <span>Project Ref: <strong className="text-amber-400 font-mono">{lead.id}</strong></span>}
             </p>
           </div>
 
@@ -118,13 +112,13 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
               <Download className="w-4 h-4 text-amber-400" />
               <span>{t("downloadPdf")}</span>
             </button>
-            <button
+            {!isPreview && <button
               onClick={handleCopyLink}
               className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl transition-all cursor-pointer backdrop-blur-md shadow-sm"
             >
               <Share2 className="w-4 h-4 text-emerald-400" />
               <span>{copied ? "Link Copied!" : "Share Link"}</span>
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -133,7 +127,7 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
           <div className="bg-white/10 border border-white/15 rounded-2xl p-4 sm:p-5 backdrop-blur-md">
             <div className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider mb-1 flex items-center justify-between">
               <span>Selected Plant</span>
-              <Sun className="w-4 h-4 text-amber-400 animate-spin" />
+              <PanelsTopLeft className="w-4 h-4 text-amber-400" />
             </div>
             <div className="text-2xl sm:text-4xl font-black text-amber-400 font-mono">
               {activeOption.systemSizeKw} <span className="text-base font-normal text-slate-300">kW</span>
@@ -152,7 +146,7 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
               {formatCurrency(activeOption.subsidyAmount)}
             </div>
             <p className="text-xs text-emerald-100/70 mt-1 font-medium">
-              Direct transfer to your bank account
+              Subject to eligibility and approval
             </p>
           </div>
 
@@ -178,7 +172,7 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
               {activeOption.paybackYears} <span className="text-base font-normal text-slate-300">{t("years")}</span>
             </div>
             <p className="text-xs text-emerald-100/70 mt-1 font-medium">
-              Free power for next 21+ years
+              Based on the assumptions below
             </p>
           </div>
         </div>
@@ -200,9 +194,7 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
             </p>
           </div>
 
-          <div className="text-right text-xs font-mono text-slate-400">
-            <span>Rule Snapshot: <strong className="text-emerald-700 dark:text-emerald-400">{quote.subsidyRuleId}</strong></span>
-          </div>
+          <span className="text-xs font-medium text-slate-400">Based on current estimate assumptions</span>
         </div>
 
         {/* The 3 Cards */}
@@ -213,19 +205,12 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
             return (
               <div
                 key={opt.systemSizeKw}
-                onClick={() => setSelectedKw(opt.systemSizeKw)}
-                className={`rounded-3xl p-6 border-2 transition-all cursor-pointer relative flex flex-col justify-between ${
+                className={`rounded-3xl p-6 border-2 transition-all relative flex flex-col justify-between ${
                   isSelected
                     ? "border-[#198754] bg-[#E7F3EC]/30 dark:bg-emerald-950/30 shadow-lg scale-[1.02]"
                     : "border-slate-200 dark:border-slate-800 hover:border-emerald-400 bg-white dark:bg-slate-950"
                 }`}
               >
-                {opt.systemSizeKw === 3 && (
-                  <div className="absolute -top-3.5 right-6 bg-[#198754] text-white text-[11px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-xs">
-                    ★ Best Value (Max Subsidy)
-                  </div>
-                )}
-
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -280,7 +265,7 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
                       <span className="font-mono font-bold text-slate-900 dark:text-white">{opt.annualGenerationUnits} Units</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Annual Savings:</span>
+                      <span className="text-slate-500">Estimated annual offset:</span>
                       <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(opt.annualSavings)}/yr</span>
                     </div>
                     <div className="flex justify-between">
@@ -293,6 +278,8 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
                 <div className="mt-5 pt-3">
                   <button
                     type="button"
+                    onClick={() => setSelectedKw(opt.systemSizeKw)}
+                    aria-pressed={isSelected}
                     className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
                       isSelected
                         ? "bg-[#198754] text-white shadow-xs"
@@ -308,8 +295,20 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
         </div>
       </div>
 
-      {/* LIVE ANIMATED SOLAR ENERGY FLOW SIMULATOR */}
-      <AnimatedEnergyFlow systemSizeKw={selectedKw} />
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm dark:border-slate-800 dark:bg-slate-900">
+        <h3 className="font-semibold text-slate-900 dark:text-white">How this estimate is calculated</h3>
+        <p className="mt-2 leading-6 text-slate-600 dark:text-slate-400">
+          Generation uses {quote.ruleSnapshot.generationFactor.toLocaleString()} units per kW per year. Savings and payback use an assumed tariff of {formatCurrency(quote.ruleSnapshot.tariffAssumption)} per unit; actual savings depend on usage, export credits, site conditions and the applicable tariff.
+        </p>
+        <p className="mt-2 leading-6 text-slate-600 dark:text-slate-400">
+          Subsidy is an estimate under current scheme rules and is subject to eligibility approval. Installation prices are indicative and will be confirmed after a site survey.
+        </p>
+      </div>
+
+      <AnimatedEnergyFlow
+        systemSizeKw={selectedKw}
+        annualGenerationUnits={activeOption.annualGenerationUnits}
+      />
 
       {/* CUSTOMER QUOTATION ACCEPTANCE ACTION BAR */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-5 shadow-sm print:hidden">
@@ -320,28 +319,35 @@ export function QuoteDisplay({ lead, initialRule = DEFAULT_SUBSIDY_RULE }: Quote
             </span>
           </div>
           <h4 className="text-lg font-black text-slate-900 dark:text-white">
-            {isAccepted ? "Quotation Accepted! Next: Site Survey Assignment" : "Accept Quotation & Initiate Project"}
+            {isPreview ? "Want to keep this estimate?" : isAccepted ? "Quotation Accepted! Next: Site Survey Assignment" : "Accept Quotation & Initiate Project"}
           </h4>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-            Lock in your ₹78,000 subsidy allocation. SolarSaathi will assign our Nagpur site engineer for structural confirmation.
+            {isPreview ? "Sign in or create an account to save it and view it later in My Projects." : "This is an estimate, not a confirmed order. A site survey and subsidy eligibility check are still required."}
           </p>
+          {actionError && <p role="alert" className="mt-2 text-xs font-medium text-red-600">{actionError}</p>}
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          {!isAccepted ? (
-            <button
-              onClick={handleAcceptQuote}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-[#198754] hover:bg-[#123D2B] text-white rounded-2xl font-black text-sm shadow-lg shadow-emerald-900/20 transition-all hover:scale-[1.02] cursor-pointer"
-            >
-              <Check className="w-4 h-4" />
-              <span>Accept Quotation</span>
-            </button>
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+          {isPreview ? <button type="button" onClick={onSaveEstimate} disabled={isSavingEstimate} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-[#198754] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#123D2B] disabled:opacity-60">
+            {isSavingEstimate ? "Saving…" : user ? "Save estimate to My Projects" : "Sign in to save estimate"}
+          </button> : !isAccepted ? (
+            user ? <button
+                onClick={handleAcceptQuote}
+                disabled={isAccepting}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-[#198754] hover:bg-[#123D2B] text-white rounded-2xl font-black text-sm shadow-lg shadow-emerald-900/20 transition-all hover:scale-[1.02] cursor-pointer disabled:opacity-60"
+              >
+                <Check className="w-4 h-4" />
+                <span>{isAccepting ? "Saving…" : "Accept estimate & request next step"}</span>
+              </button> : <>
+                <Link href={`/login?next=${encodeURIComponent(`/track/${lead.id}`)}`} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-[#198754] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#123D2B]">Sign in to accept</Link>
+                <Link href={`/signup?next=${encodeURIComponent(`/track/${lead.id}`)}`} className="text-center text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-400">Create an account</Link>
+              </>
           ) : (
             <Link
               href={`/track/${lead.id}`}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-[#123D2B] hover:bg-[#198754] text-white rounded-2xl font-black text-sm shadow-lg transition-all"
             >
-              <span>View Live Project Tracker</span>
+              <span>View project tracker</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           )}

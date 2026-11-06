@@ -2,44 +2,30 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  Users,
   CheckCircle2,
   AlertTriangle,
   ArrowUpRight,
-  TrendingUp,
   Sliders,
   Search,
-  Filter,
   Eye,
-  RefreshCw,
   Phone,
-  FileCheck,
-  Zap,
-  MapPin,
   Save,
-  HardHat,
-  PhoneCall,
-  ShieldCheck,
-  User,
-  Sparkles,
-  MessageSquare,
-  AlertCircle,
   IndianRupee,
-  Clock,
-  ArrowRight,
   Check,
 } from "lucide-react";
 import { Lead, SubsidyRule, PricingRule, ProjectStage, NextAction } from "@/types/solar";
 import { formatCurrency } from "@/lib/utils";
-import { useAuth, UserRole } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
+import { SolarSaathiLogo } from "@/components/SolarSaathiLogo";
 
 export default function AdminDashboardPage() {
-  const { user, quickLogin } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [rules, setRules] = useState<SubsidyRule[]>([]);
-  const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
-  const [activeTab, setActiveTab] = useState<"leads" | "stuck" | "rules" | "notifications" | "analytics">("leads");
+  const [activeTab, setActiveTab] = useState<"leads" | "stuck" | "rules" | "analytics">("leads");
   const [filterScore, setFilterScore] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -89,7 +75,6 @@ export default function AdminDashboardPage() {
         setGenerationBenchmark(r.generationPerKwPerYear);
       }
       if (data.pricing) {
-        setPricingRules(data.pricing);
         const priceMap: Record<number, number> = {};
         data.pricing.forEach((p: PricingRule) => {
           priceMap[p.systemSizeKw] = p.price;
@@ -102,8 +87,22 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    Promise.all([fetchLeads(), fetchRules()]).finally(() => setIsLoading(false));
-  }, []);
+    if (isAuthLoading) return;
+    if (!user || user.role === "HOMEOWNER") {
+      router.replace("/login");
+      return;
+    }
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      void Promise.all([fetchLeads(), fetchRules()]).finally(() => {
+        if (active) setIsLoading(false);
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [isAuthLoading, router, user]);
 
   const handleUpdateStatus = async (leadId: string, newStatus: ProjectStage, nextAction?: NextAction) => {
     try {
@@ -142,7 +141,6 @@ export default function AdminDashboardPage() {
           tier2RatePerKw: Number(tier2Rate),
         }),
       });
-      const data = await res.json();
       if (res.ok) {
         setRuleSaveMsg("Subsidy rule updated with new effective dates!");
         setTimeout(() => setRuleSaveMsg(null), 3500);
@@ -186,82 +184,36 @@ export default function AdminDashboardPage() {
 
   const stuckLeads = leads.filter((l) => l.isStuck || (l.lastUpdatedDaysAgo && l.lastUpdatedDaysAgo > 7));
 
-  // Collect all notifications for the audit trail
-  const allNotifications = leads.flatMap((l) =>
-    (l.notifications || []).map((n) => ({
-      ...n,
-      leadId: l.id,
-      leadName: l.name,
-    }))
-  ).sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
-
   // Metrics
   const totalLeads = leads.length;
   const highLeads = leads.filter((l) => l.score === "High").length;
   const lowLeads = leads.filter((l) => l.score === "Low").length;
   const savedSurveyCost = lowLeads * 2500;
 
-  const currentRole = user?.role || "COORDINATOR";
+  const currentRole = user?.role;
+
+  if (isAuthLoading || isLoading) {
+    return (
+      <main className="mx-auto flex min-h-[60vh] max-w-7xl items-center justify-center px-4">
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 text-sm font-medium text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+          Loading your workspace…
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 transition-colors">
-      {/* ROLE SWITCHER STRIP (EVALUATOR SHORTCUT) */}
-      <div className="bg-[#E7F3EC]/80 dark:bg-slate-900 border border-[#198754]/30 dark:border-slate-800 p-3 sm:p-4 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-2.5">
-          <Sparkles className="w-4 h-4 text-[#198754] shrink-0" />
-          <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-            Active Staff Perspective:
-          </span>
-          <span className="text-xs font-mono font-bold text-[#123D2B] dark:text-emerald-300 bg-white dark:bg-slate-800 px-2.5 py-0.5 rounded-lg border border-[#198754]/30">
-            {currentRole} ({user?.name || "Sunil Deshpande"})
-          </span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-          <span className="text-[11px] text-slate-500 mr-1">Switch Perspective:</span>
-          <button
-            onClick={() => quickLogin("SALES")}
-            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
-              currentRole === "SALES"
-                ? "bg-[#123D2B] text-white shadow-xs"
-                : "bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-            }`}
-          >
-            <PhoneCall className="w-3 h-3" />
-            <span>Sales Desk</span>
-          </button>
-
-          <button
-            onClick={() => quickLogin("SURVEYOR")}
-            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
-              currentRole === "SURVEYOR"
-                ? "bg-[#123D2B] text-white shadow-xs"
-                : "bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-            }`}
-          >
-            <HardHat className="w-3 h-3" />
-            <span>Site Surveyor</span>
-          </button>
-
-          <button
-            onClick={() => quickLogin("COORDINATOR")}
-            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
-              currentRole === "COORDINATOR"
-                ? "bg-[#123D2B] text-white shadow-xs"
-                : "bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-            }`}
-          >
-            <ShieldCheck className="w-3 h-3" />
-            <span>Coordinator / Admin</span>
-          </button>
-        </div>
+      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+        Signed in as <strong>{user?.name}</strong> · {user?.role}
       </div>
 
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <SolarSaathiLogo size="md" />
+            <h1 className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white">
               SolarSaathi • Operations & CRM Portal
             </h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#E7F3EC] text-[#123D2B] border border-[#198754]/40">
@@ -298,28 +250,18 @@ export default function AdminDashboardPage() {
             <span>Stuck Projects ({stuckLeads.length})</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab("rules")}
-            className={`px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "rules"
-                ? "bg-white dark:bg-slate-800 text-[#123D2B] dark:text-white shadow-xs"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            }`}
-          >
-            Subsidy & Pricing Master
-          </button>
-
-          <button
-            onClick={() => setActiveTab("notifications")}
-            className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "notifications"
-                ? "bg-white dark:bg-slate-800 text-[#123D2B] dark:text-white shadow-xs"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>SMS/WhatsApp Logs</span>
-          </button>
+          {currentRole === "COORDINATOR" && (
+            <button
+              onClick={() => setActiveTab("rules")}
+              className={`px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === "rules"
+                  ? "bg-white dark:bg-slate-800 text-[#123D2B] dark:text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              Subsidy & Pricing Master
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab("analytics")}
@@ -341,15 +283,15 @@ export default function AdminDashboardPage() {
           <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white font-mono">
             {totalLeads}
           </div>
-          <span className="text-xs text-[#198754] font-semibold">100% AI Bill Parsed</span>
+          <span className="text-xs text-slate-400 font-medium">Enquiries in your workspace</span>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
-          <span className="text-xs text-slate-500 font-medium">High-Priority Physical Surveys</span>
+          <span className="text-xs text-slate-500 font-medium">High-fit · survey review</span>
           <div className="text-2xl sm:text-3xl font-black text-[#198754] font-mono">
             {highLeads}
           </div>
-          <span className="text-xs text-slate-400 font-medium">Owner &gt;200 units/mo</span>
+          <span className="text-xs text-slate-400 font-medium">Suggested survey review</span>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
@@ -357,15 +299,15 @@ export default function AdminDashboardPage() {
           <div className="text-2xl sm:text-3xl font-black text-amber-500 font-mono">
             {lowLeads}
           </div>
-          <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Tenants & bills &lt;₹800</span>
+          <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Suggested phone review</span>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
-          <span className="text-xs text-slate-500 font-medium">Survey Waste Avoided</span>
+          <span className="text-xs text-slate-500 font-medium">Illustrative low-score visit cost</span>
           <div className="text-2xl sm:text-3xl font-black text-[#123D2B] dark:text-emerald-400 font-mono">
             {formatCurrency(savedSurveyCost)}
           </div>
-          <span className="text-xs text-slate-400 font-medium">@ ₹2,500/saved physical visit</span>
+          <span className="text-xs text-slate-400 font-medium">Low-score leads × ₹2,500 estimate</span>
         </div>
       </div>
 
@@ -535,25 +477,28 @@ export default function AdminDashboardPage() {
                     <span className="text-xs font-extrabold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
                       Delayed: {stk.lastUpdatedDaysAgo || 10} Days
                     </span>
-                    <span className="text-xs text-slate-500">Stage: {stk.status}</span>
+                    <span className="text-xs text-slate-500">Stage: {stk.timeline?.find((item) => item.stage === stk.status)?.title || stk.status}</span>
                   </div>
                   <h4 className="text-base font-black text-slate-900 dark:text-white">
                     {stk.name} • {stk.address}, {stk.city}
                   </h4>
                   <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Awaiting DISCOM inspection / net-metering synchronization. Assigned Officer:{" "}
-                    <strong>{stk.assignedStaff || "Amit Verma"}</strong>
+                    No recent update is recorded. Confirm the latest status before advancing the project.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0">
-                  <a
-                    href={`tel:${stk.phone}`}
-                    className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1.5"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Call Customer</span>
-                  </a>
+                  {stk.phone && stk.phone !== "0000000000" ? (
+                    <a
+                      href={`tel:${stk.phone}`}
+                      className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Call Customer</span>
+                    </a>
+                  ) : (
+                    <span className="px-3.5 py-2 text-xs font-medium text-slate-500">No phone number available</span>
+                  )}
                   <button
                     onClick={() => handleUpdateStatus(stk.id, "SUBSIDY_APPLICATION")}
                     className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-xs"
@@ -755,96 +700,41 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* TAB 4: AUDIT TRAIL OF SMS & WHATSAPP LOGS */}
-      {activeTab === "notifications" && (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm">
-          <div>
-            <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-[#198754]" />
-              Automated WhatsApp & SMS Notification Dispatch Logs
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium">
-              Real-time audit log of all communications sent to homeowners upon intake submission and milestone progress.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {allNotifications.map((notif, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 text-xs"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                        notif.channel === "WhatsApp"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-blue-100 text-blue-800"
-                      }`}
-                    >
-                      {notif.channel}
-                    </span>
-                    <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
-                      Ref #{notif.leadId} ({notif.leadName})
-                    </span>
-                    <span className="text-slate-400">To: {notif.recipient}</span>
-                  </div>
-                  <p className="text-slate-800 dark:text-slate-200 font-medium">
-                    &quot;{notif.message}&quot;
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="font-mono text-slate-400 block text-[11px]">
-                    {new Date(notif.sentAt).toLocaleTimeString("en-IN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <span className="font-bold text-[#198754]">✓✓ {notif.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* TAB 5: BUSINESS SAVINGS ANALYTICS (Brief ROI Justification) */}
       {activeTab === "analytics" && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm">
           <div>
             <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
-              Financial Impact & Survey Waste Elimination
+              Client assumptions and targets
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium">
-              Direct verification of the Nagpur solar problem statement assumptions and operational savings.
+              Scenario figures below come from the client brief. Targets are goals, not measured results.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs sm:text-sm">
             <div className="p-6 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/80 rounded-3xl space-y-3.5">
               <span className="font-black text-red-900 dark:text-red-300 uppercase tracking-wider text-xs block">
-                The Old Problem (Manual Process)
+                Stated annual opportunity
               </span>
               <ul className="space-y-2 text-red-800 dark:text-red-300 list-disc list-inside font-medium">
-                <li>1,400 leads/month with only 25% (350) genuine.</li>
-                <li>40% of 220 monthly surveys wasted on tenants or ₹600 bills.</li>
+                <li>1,400 leads/month; 25% (350) expected to be genuine.</li>
+                <li>40% of 220 monthly surveys expected to be unqualified.</li>
                 <li>88 wasted surveys × ₹2,500 = <strong>₹26.4 Lakh/year wasted</strong>.</li>
-                <li>Quotes took 3 days: 14 lost leads/month = <strong>₹60.48 Lakh/year lost</strong>.</li>
-                <li>Total Annual Loss: <strong>₹86.88 Lakh / year</strong>.</li>
+                <li>Quote delay assumption: 14 lost leads/month × ₹36,000 margin = <strong>₹60.48 Lakh/year</strong>.</li>
+                <li>Combined opportunity stated in the brief: <strong>₹86.88 Lakh/year</strong>.</li>
               </ul>
             </div>
 
             <div className="p-6 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 rounded-3xl space-y-3.5">
               <span className="font-black text-emerald-900 dark:text-emerald-300 uppercase tracking-wider text-xs block">
-                The Solution (SolarSaathi AI Platform)
+                Client success targets
               </span>
               <ul className="space-y-2 text-emerald-800 dark:text-emerald-300 list-disc list-inside font-medium">
-                <li>Instant AI Bill Reading filters tenants & tiny bills automatically.</li>
-                <li>Unqualified physical surveys cut from 40% to <strong>under 12%</strong>.</li>
-                <li>Instant Same-Day Quote with automatic PM Surya Ghar subsidy math.</li>
-                <li>Status calls reduced by &gt;50% via the Public Magic Link Tracker.</li>
-                <li>Net Annual Business Savings: <strong>~₹65+ Lakhs/year</strong>.</li>
+                <li>Unqualified surveys: reduce from 40% to <strong>under 15%</strong>.</li>
+                <li>Quotes sent on the survey day: <strong>90%</strong>.</li>
+                <li>Project status calls: reduce by <strong>50%</strong>.</li>
+                <li>Review actual outcomes against these targets after launch.</li>
               </ul>
             </div>
           </div>

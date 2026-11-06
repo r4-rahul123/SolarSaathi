@@ -129,7 +129,7 @@ At every stage transition, an automated notification is created and displayed in
 ### Stuck Projects Escalation (>7 Days Inactivity):
 If a project remains in any stage without progress for more than 7 days (e.g. `PR-1025` stuck 10 days at Net Metering, `PR-1026` stuck 15 days), it is automatically:
 - Flagged in the customer tracker with an Inactive Project Alert.
-- Prominently surfaced in the Staff CRM **Stuck Projects** tab with 1-click customer phone contact and stage resolution actions.
+- Prominently surfaced in the Staff CRM **Stuck Projects** tab with customer contact and separate stage update actions.
 
 ---
 

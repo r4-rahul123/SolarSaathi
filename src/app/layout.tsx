@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { AuthModal } from "@/components/AuthModal";
+import { SolarSaathiLogo } from "@/components/SolarSaathiLogo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,9 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SolarSaathi | AI-Powered Rooftop Solar Sales & Project Management",
+  title: "SolarSaathi | Rooftop solar estimates",
   description:
-    "AI-powered rooftop solar qualification, instant PM Surya Ghar subsidy calculations, and real-time project milestone tracking for Nagpur and Vidarbha.",
+    "Review an indicative rooftop solar system, price and payback estimate for homes in Nagpur and Vidarbha.",
 };
 
 export default function RootLayout({
@@ -47,15 +48,13 @@ export default function RootLayout({
               <footer className="bg-[#123D2B] dark:bg-[#06150F] text-slate-300 text-xs py-8 border-t border-emerald-950/60 transition-colors">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
                   <div>
-                    <span className="font-bold text-white text-sm">SolarSaathi (सोलर साथी)</span> • Nagpur & Vidarbha, Maharashtra
+                    <span className="inline-flex items-center gap-2"><SolarSaathiLogo size="sm" inverse withName /><span className="text-sm">(सोलर साथी)</span></span> • Nagpur & Vidarbha, Maharashtra
                     <p className="text-xs text-emerald-200/70 mt-1">
-                      Compliant with PM Surya Ghar: Muft Bijli Yojana & DPDP Act 2023.
+                      Solar estimates for homes in Nagpur and Vidarbha.
                     </p>
                   </div>
                   <div className="flex gap-4 text-xs font-medium">
-                    <span className="text-emerald-200/80">Benchmark: 1,400 kWh/kW/Year</span>
-                    <span className="text-emerald-400">•</span>
-                    <span className="text-amber-400 font-semibold">₹78,000 Max Subsidy Cap</span>
+                    <span className="text-emerald-200/80">Final design and savings depend on site survey and current scheme rules.</span>
                   </div>
                 </div>
               </footer>

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SolarDB } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth-server";
 
 export async function GET() {
   try {
-    const leads = SolarDB.getLeads();
+    const user = await getSessionUser();
+    if (!user || user.role === "HOMEOWNER") return NextResponse.json({ error: "Sign in with a staff account." }, { status: 403 });
+    const leads = await SolarDB.getLeads();
     return NextResponse.json({ success: true, leads });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to fetch leads";
@@ -14,6 +17,10 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const user = await getSessionUser();
+    if (!user || user.role !== "HOMEOWNER") {
+      return NextResponse.json({ error: "Sign in with a homeowner account to save this estimate." }, { status: 401 });
+    }
 
     // Basic input validation
     if (!body.name || !body.phone || !body.occupancy) {
@@ -23,7 +30,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newLead = SolarDB.createLead({
+    const newLead = await SolarDB.createLead({
+      ownerUserId: user.id,
       name: body.name,
       phone: body.phone,
       email: body.email || "",

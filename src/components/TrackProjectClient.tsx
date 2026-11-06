@@ -1,34 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import {
-  CheckCircle2,
-  Clock,
-  MapPin,
-  Phone,
-  ArrowLeft,
-  Sun,
-  ShieldCheck,
-  FileText,
-  Calendar,
-  AlertTriangle,
-  Send,
-  MessageSquare,
-  Sparkles,
-  ArrowRight,
-  Zap,
-  Check,
-  ChevronRight,
-  TrendingUp,
-} from "lucide-react";
-import { Lead, ProjectStage, MockNotification } from "@/types/solar";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, Calendar, CheckCircle2, MapPin } from "lucide-react";
+import { Lead, ProjectStage } from "@/types/solar";
 import { formatCurrency } from "@/lib/utils";
-import confetti from "canvas-confetti";
+import { useAuth } from "@/context/AuthContext";
 
 interface TrackProjectClientProps {
   initialLead: Lead;
-  allLeads: { id: string; name: string; score: string; isStuck?: boolean; status: ProjectStage }[];
 }
 
 const ORDERED_STAGES: ProjectStage[] = [
@@ -42,460 +23,89 @@ const ORDERED_STAGES: ProjectStage[] = [
   "SUBSIDY_CREDITED",
 ];
 
-export function TrackProjectClient({ initialLead, allLeads }: TrackProjectClientProps) {
-  const [lead, setLead] = useState<Lead>(initialLead);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [activeTab, setActiveTab] = useState<"timeline" | "notifications" | "photos">("timeline");
-
-  // Mask consumer number for DPDP compliance (e.g. 4100****3741)
-  const rawConsumer = lead.billExtraction?.consumerNumber || "410019283741";
-  const maskedConsumer =
-    rawConsumer.length > 8
-      ? `${rawConsumer.slice(0, 4)}****${rawConsumer.slice(-4)}`
-      : rawConsumer;
-
+export function TrackProjectClient({ initialLead }: TrackProjectClientProps) {
+  const router = useRouter();
+  const { user, setIsAuthModalOpen } = useAuth();
+  const [lead, setLead] = useState(initialLead);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [error, setError] = useState("");
+  const rawConsumer = lead.billExtraction?.consumerNumber || "";
+  const maskedConsumer = rawConsumer.length > 8 ? `${rawConsumer.slice(0, 4)}****${rawConsumer.slice(-4)}` : rawConsumer;
   const currentStageIndex = ORDERED_STAGES.indexOf(lead.status);
+  const activeOption = lead.quote?.options?.find((option) => option.systemSizeKw === lead.recommendedKw) || lead.quote?.options?.[0];
+  const isCustomer = user?.role === "HOMEOWNER";
+  const canAccept = isCustomer && (!lead.ownerUserId || lead.ownerUserId === user.id) && lead.status !== "QUOTATION_APPROVED";
 
-  const handleAdvanceStage = async () => {
-    if (currentStageIndex >= ORDERED_STAGES.length - 1) return;
-    const nextStage = ORDERED_STAGES[currentStageIndex + 1];
-    setIsUpdating(true);
-
+  const acceptEstimate = async () => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setIsAccepting(true);
+    setError("");
     try {
-      const res = await fetch(`/api/leads/${lead.id}`, {
+      const response = await fetch(`/api/leads/${lead.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStage }),
+        body: JSON.stringify({ status: "QUOTATION_APPROVED", recommendedKw: lead.recommendedKw }),
       });
-      const data = await res.json();
-      if (data.lead) {
-        setLead(data.lead);
-        if (nextStage === "SUBSIDY_CREDITED") {
-          confetti({
-            particleCount: 120,
-            spread: 90,
-            origin: { y: 0.5 },
-            colors: ["#198754", "#123D2B", "#f59e0b"],
-          });
-        }
-      }
-    } catch (e) {
-      console.error(e);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not accept this estimate.");
+      setLead(data.lead);
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not accept this estimate.");
     } finally {
-      setIsUpdating(false);
+      setIsAccepting(false);
     }
   };
 
-  const isStuck = lead.isStuck || (lead.lastUpdatedDaysAgo && lead.lastUpdatedDaysAgo > 7);
-  const tier = lead.score || lead.scoreBreakdown?.tier || "High";
-  const activeOption =
-    lead.quote?.options?.find((o) => o.systemSizeKw === lead.recommendedKw) ||
-    lead.quote?.options?.[0];
-  const subsidyVal = activeOption?.subsidyAmount ?? 78000;
-  const paybackVal = activeOption?.paybackYears ?? 3.2;
-
-  const defaultNotifications: MockNotification[] = [
-    {
-      id: "nt-def",
-      channel: "WhatsApp",
-      recipient: lead.phone,
-      message: `Namaskar ${lead.name}, your solar inquiry (Ref: #${lead.id}) has been recorded. Track live: solarsaathi.app/track/${lead.id}`,
-      sentAt: lead.createdAt || new Date().toISOString(),
-      status: "DELIVERED",
-    },
-  ];
-  const displayNotifications =
-    lead.notifications && lead.notifications.length > 0
-      ? lead.notifications
-      : defaultNotifications;
-
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8 transition-colors">
-      {/* Top Navigation & Status Tag */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 hover:text-[#198754] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Calculator</span>
-        </Link>
+    <main className="mx-auto max-w-4xl space-y-6 px-4 py-8 transition-colors sm:px-6">
+      <Link href={user?.role === "HOMEOWNER" ? "/track" : "/"} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-emerald-700 dark:text-slate-300">
+        <ArrowLeft className="h-4 w-4" /> {user?.role === "HOMEOWNER" ? "Back to my projects" : "Back to SolarSaathi"}
+      </Link>
 
-        {/* Demo Switcher for Reviewer Convenience */}
-        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 overflow-x-auto pb-1 sm:pb-0">
-          <span className="font-bold text-slate-600 dark:text-slate-400 shrink-0">Demo Stages:</span>
-          {allLeads.map((dl) => (
-            <Link
-              key={dl.id}
-              href={`/track/${dl.id}`}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all shrink-0 ${
-                dl.id.toLowerCase() === lead.id.toLowerCase()
-                  ? "bg-[#123D2B] text-white shadow-xs"
-                  : dl.isStuck
-                  ? "bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200"
-                  : "bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
-              }`}
-            >
-              {dl.id} {dl.isStuck ? "(⚠ Stuck)" : `(${dl.score})`}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* STUCK PROJECT ALERT BANNER */}
-      {isStuck && (
-        <div className="p-5 rounded-3xl bg-amber-500/10 dark:bg-amber-950/40 border-2 border-amber-500/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-pulse">
-          <div className="flex items-start gap-3.5">
-            <div className="p-2.5 rounded-2xl bg-amber-500 text-white shrink-0 mt-0.5">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-black uppercase bg-amber-500 text-white">
-                  Stuck Project Alert
-                </span>
-                <span className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                  Inactive for {lead.lastUpdatedDaysAgo || 10} Days (&gt;7 Days Threshold)
-                </span>
-              </div>
-              <h4 className="text-sm sm:text-base font-extrabold text-amber-950 dark:text-amber-100 mt-1">
-                Awaiting MSEDCL Discom Inspection Approval
-              </h4>
-              <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
-                Escalated to Nagpur Urban Circle Coordinator (Amit Verma) for expedite dispatch.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleAdvanceStage}
-            disabled={isUpdating}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
-          >
-            Resolve & Advance Stage
-          </button>
-        </div>
-      )}
-
-      {/* Main Project Header Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md p-6 sm:p-8 space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
+      <section className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+        <div className="flex flex-col justify-between gap-5 border-b border-slate-100 pb-6 dark:border-slate-800 sm:flex-row sm:items-start">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="font-mono font-black text-[#123D2B] dark:text-emerald-300 bg-[#E7F3EC] dark:bg-[#123D2B]/50 border border-[#198754]/30 px-3 py-1 rounded-xl text-xs">
-                Ref: #{lead.id}
-              </span>
-              <span
-                className={`text-xs font-bold px-3 py-1 rounded-full ${
-                  tier === "High"
-                    ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
-                    : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
-                }`}
-              >
-                Score: {tier} Fit ({lead.scoreBreakdown?.totalScore || 85}/100)
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-              {lead.name}&apos;s Rooftop Solar Installation
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-1 font-medium">
-              <MapPin className="w-4 h-4 text-[#198754]" />
-              <span>
-                {lead.address}, {lead.city} - {lead.pincode}
-              </span>
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Project ref · {lead.id}</p>
+            <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">Your rooftop solar estimate</h1>
+            <p className="mt-2 flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400"><MapPin className="h-4 w-4 text-emerald-700" />{lead.address}, {lead.city} · {lead.pincode}</p>
           </div>
+          <div className="rounded-2xl bg-emerald-50 px-5 py-4 dark:bg-emerald-950/40"><p className="text-xs text-slate-500 dark:text-slate-400">Recommended system</p><p className="mt-1 text-2xl font-bold text-emerald-800 dark:text-emerald-300">{lead.recommendedKw} kW</p>{activeOption && <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Indicative net cost {formatCurrency(activeOption.netCost)}</p>}</div>
+        </div>
 
-          <div className="text-left sm:text-right">
-            <span className="text-xs text-slate-400 font-medium">Recommended Plant</span>
-            <div className="text-3xl font-black text-slate-900 dark:text-white font-mono">
-              {lead.recommendedKw} kW <span className="text-sm font-normal text-slate-400">On-Grid</span>
-            </div>
-            <span className="text-xs font-bold text-[#198754] dark:text-emerald-400">
-              Subsidy: {formatCurrency(subsidyVal)} (Direct DBT)
-            </span>
+        <div className="grid grid-cols-2 gap-4 rounded-2xl bg-slate-50 p-4 text-sm dark:bg-slate-950 sm:grid-cols-4">
+          <div><p className="text-xs text-slate-400">Monthly use</p><p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">{lead.avgUnitsPerMonth} kWh</p></div>
+          <div><p className="text-xs text-slate-400">Monthly bill</p><p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">{formatCurrency(lead.monthlyBill)}</p></div>
+          <div><p className="text-xs text-slate-400">Estimated subsidy</p><p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">{activeOption ? formatCurrency(activeOption.subsidyAmount) : "Pending"}</p></div>
+          <div><p className="text-xs text-slate-400">Consumer number</p><p className="mt-1 font-mono font-semibold text-slate-800 dark:text-slate-200">{maskedConsumer || "—"}</p></div>
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">This is an indicative estimate. Final system design, installation price and subsidy depend on the site survey and eligibility approval.</div>
+
+        <div>
+          <div className="mb-5"><h2 className="text-lg font-semibold text-slate-900 dark:text-white">Project progress</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">We’ll update each milestone as your enquiry moves forward.</p></div>
+          <div className="relative space-y-6 pl-8 before:absolute before:bottom-2 before:left-3 before:top-2 before:w-px before:bg-slate-200 dark:before:bg-slate-700">
+            {ORDERED_STAGES.map((stage, index) => {
+              const milestone = lead.timeline?.find((item) => item.stage === stage);
+              const completed = index < currentStageIndex || (index === currentStageIndex && lead.status === "SUBSIDY_CREDITED");
+              const current = index === currentStageIndex && lead.status !== "SUBSIDY_CREDITED";
+              return <article key={stage} className="relative">
+                <span className={`absolute -left-8 top-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-sm dark:border-slate-900 ${completed ? "bg-emerald-600" : current ? "bg-[#123D2B] ring-4 ring-emerald-500/15" : "bg-slate-300 dark:bg-slate-700"}`}>{completed ? <CheckCircle2 className="h-4 w-4" /> : index + 1}</span>
+                <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-center"><h3 className={`text-sm font-semibold ${completed || current ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-500"}`}>{milestone?.title || `${index + 1}. ${stage.replaceAll("_", " ")}`}</h3>{milestone?.completedAt && <span className="inline-flex items-center gap-1 text-xs text-slate-400"><Calendar className="h-3.5 w-3.5" />{new Date(milestone.completedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>}</div>
+                <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{milestone?.description || "This step will begin after the previous milestone is complete."}</p>
+                {current && <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">Current stage</span>}
+              </article>;
+            })}
           </div>
         </div>
 
-        {/* Quick Highlights Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-2 border-b border-slate-100 dark:border-slate-800 text-xs sm:text-sm">
-          <div>
-            <span className="text-slate-400 block text-xs">MSEDCL Consumer</span>
-            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{maskedConsumer}</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block text-xs">Occupancy</span>
-            <span className="font-bold text-slate-800 dark:text-slate-200">{lead.occupancy}</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block text-xs">Monthly Units</span>
-            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{lead.avgUnitsPerMonth} kWh</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block text-xs">Estimated Payback</span>
-            <span className="font-mono font-bold text-[#198754] dark:text-emerald-400">
-              {paybackVal} Years
-            </span>
-          </div>
-        </div>
-
-        {/* Tab Switcher: Timeline vs Mock Notifications */}
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab("timeline")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === "timeline"
-                  ? "bg-[#123D2B] text-white shadow-xs"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-              }`}
-            >
-              8-Stage Milestone Tracker
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("notifications")}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                activeTab === "notifications"
-                  ? "bg-[#123D2B] text-white shadow-xs"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>SMS Stream</span>
-              <span className="text-[10px] bg-[#198754] text-white px-1.5 py-0.2 rounded-full">
-                {lead.notifications?.length || 1}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("photos")}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                activeTab === "photos"
-                  ? "bg-[#123D2B] text-white shadow-xs"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-              }`}
-            >
-              <span>Site Photos</span>
-            </button>
-          </div>
-
-          {currentStageIndex < ORDERED_STAGES.length - 1 && (
-            <button
-              type="button"
-              onClick={handleAdvanceStage}
-              disabled={isUpdating}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold bg-[#198754] hover:bg-[#123D2B] text-white rounded-xl transition-all shadow-xs cursor-pointer"
-            >
-              <span>Advance Next Stage</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* TAB 1: SWIGGY-STYLE 8-STAGE TIMELINE */}
-        {activeTab === "timeline" && (
-          <div className="mt-4">
-            <div className="relative pl-6 sm:pl-8 space-y-8 before:absolute before:left-[11px] sm:before:left-[15px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-200 dark:before:bg-slate-800">
-              {ORDERED_STAGES.map((stg, idx) => {
-                const milestone = lead.timeline?.find((t) => t.stage === stg);
-                const isPast = idx < currentStageIndex;
-                const isCurrent = idx === currentStageIndex;
-                const isCompleted = isPast || (isCurrent && lead.status === "SUBSIDY_CREDITED");
-
-                return (
-                  <div key={stg} className="relative flex items-start gap-4">
-                    {/* Indicator Dot */}
-                    <div
-                      className={`absolute -left-[24px] sm:-left-[28px] mt-0.5 w-7 h-7 rounded-full flex items-center justify-center text-white border-2 border-white dark:border-slate-900 shadow-sm ${
-                        isCompleted
-                          ? "bg-[#198754]"
-                          : isCurrent
-                          ? "bg-[#123D2B] ring-4 ring-[#198754]/30"
-                          : "bg-slate-200 dark:bg-slate-800 text-slate-400"
-                      }`}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                      ) : (
-                        <span className="text-[11px] font-bold text-white">{idx + 1}</span>
-                      )}
-                    </div>
-
-                    {/* Milestone Content */}
-                    <div className="flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                        <h4
-                          className={`text-sm sm:text-base font-bold ${
-                            isCompleted
-                              ? "text-slate-900 dark:text-white"
-                              : isCurrent
-                              ? "text-[#123D2B] dark:text-emerald-400"
-                              : "text-slate-400 dark:text-slate-500"
-                          }`}
-                        >
-                          {milestone?.title || `${idx + 1}. Stage: ${stg}`}
-                        </h4>
-                        {milestone?.completedAt && (
-                          <span className="text-xs font-mono text-slate-400 flex items-center gap-1 font-medium">
-                            <Calendar className="w-3.5 h-3.5" />
-                            {new Date(milestone.completedAt).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium">
-                        {milestone?.description || "Awaiting previous stage completion."}
-                      </p>
-
-                      {isCurrent && lead.status !== "SUBSIDY_CREDITED" && (
-                        <div className="mt-2.5 inline-flex items-center gap-2 bg-[#E7F3EC] dark:bg-[#123D2B]/50 border border-[#198754]/40 px-3 py-1 rounded-xl text-xs font-bold text-[#123D2B] dark:text-emerald-300">
-                          <span className="w-2 h-2 rounded-full bg-[#198754] animate-ping" />
-                          <span>Active Milestone in Progress • Nagpur Team Assigned</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: SITE PHOTOS */}
-        {activeTab === "photos" && (
-          <div className="space-y-6 pt-2">
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
-              Verified photographic record captured by certified Nagpur solar engineers during physical inspection and panel mounting.
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-                <div className="relative h-56">
-                  <img
-                    src="/images/hero-solar-rooftop.jpg"
-                    alt="Completed Rooftop Array"
-                    className="w-full h-full object-cover"
-                  />
-                  <span className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-[#123D2B] text-white">
-                    Installed Rooftop Array
-                  </span>
-                </div>
-                <div className="p-4 space-y-1">
-                  <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white">
-                    On-Grid Rooftop Array Mount
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Elevated GI structure on flat RCC terrace. 100% shadow-free South-facing tilt.
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-                <div className="relative h-56">
-                  <img
-                    src="/images/site-surveyor.jpg"
-                    alt="Engineer Site Survey"
-                    className="w-full h-full object-cover"
-                  />
-                  <span className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-md text-[10px] font-black uppercase bg-[#198754] text-white">
-                    Engineer Site Inspection
-                  </span>
-                </div>
-                <div className="p-4 space-y-1">
-                  <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white">
-                    Shadow & Structural Analysis
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Feeder synchronization and inverter wiring inspection verified with MSEDCL.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        {activeTab === "notifications" && (
-          <div className="space-y-4 pt-2">
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
-              SolarSaathi dispatches automated updates via WhatsApp and SMS at each milestone stage to keep the homeowner informed without phone tag.
-            </div>
-
-            <div className="space-y-3">
-              {displayNotifications.map((notif: MockNotification) => (
-                <div
-                  key={notif.id}
-                  className="p-4 rounded-2xl bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 shadow-xs flex items-start justify-between gap-4"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                          notif.channel === "WhatsApp"
-                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                            : "bg-blue-100 text-blue-800 border border-blue-300"
-                        }`}
-                      >
-                        {notif.channel}
-                      </span>
-                      <span className="text-xs font-mono font-bold text-slate-500">
-                        To: {notif.recipient}
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-medium">
-                      &quot;{notif.message}&quot;
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-[11px] font-mono text-slate-400 block">
-                      {new Date(notif.sentAt).toLocaleTimeString("en-IN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    <span className="text-[10px] font-bold text-[#198754]">✓✓ {notif.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Assigned Project Coordinator Card */}
-        <div className="mt-8 p-5 bg-[#E7F3EC]/60 dark:bg-slate-950 rounded-2xl border border-[#198754]/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-[#123D2B] text-white flex items-center justify-center font-black text-sm">
-              SD
-            </div>
-            <div>
-              <span className="text-xs text-slate-500 font-medium">Assigned Nagpur Project Officer</span>
-              <div className="text-sm font-bold text-[#123D2B] dark:text-white">
-                {lead.assignedStaff || "Sunil Deshpande"} (Wardha Road & Somalwada Desk)
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <a
-              href={`tel:0712254890`}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-xs"
-            >
-              <Phone className="w-3.5 h-3.5 text-[#198754]" />
-              <span>Call Desk</span>
-            </a>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-[#123D2B] hover:bg-[#198754] rounded-xl transition-colors shadow-xs"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>View Quote</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
+        {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+        {canAccept && <div className="flex flex-col justify-between gap-4 rounded-2xl bg-slate-50 p-5 dark:bg-slate-950 sm:flex-row sm:items-center"><div><h2 className="font-semibold text-slate-900 dark:text-white">Ready to move forward?</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Accept this estimate to request the next project step.</p></div><button type="button" onClick={acceptEstimate} disabled={isAccepting} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#174b32] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#216642] disabled:opacity-60">{isAccepting ? "Saving…" : "Accept estimate"}<ArrowRight className="h-4 w-4" /></button></div>}
+        {lead.status === "QUOTATION_APPROVED" && <div className="rounded-2xl bg-emerald-50 p-5 text-sm font-medium text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">Estimate accepted. Your project will move to the next step after review.</div>}
+      </section>
+    </main>
   );
 }

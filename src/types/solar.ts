@@ -96,11 +96,12 @@ export interface MockNotification {
   recipient: string;
   message: string;
   sentAt: string;
-  status: "DELIVERED" | "READ";
+  status: "PREVIEW";
 }
 
 export interface Lead {
   id: string; // e.g. LD-30881 / PROJECT-1024
+  ownerUserId?: string;
   name: string;
   phone: string;
   email?: string;

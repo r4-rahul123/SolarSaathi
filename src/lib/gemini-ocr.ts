@@ -2,28 +2,20 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { BillExtraction } from "@/types/solar";
 
-// Zod Schema for strict structured extraction validation
+// Validate extracted fields while allowing unreadable values to remain empty.
 const BillExtractionSchema = z.object({
-  consumerNumber: z.string().min(6),
-  tariff: z.string().min(2),
-  sanctionedLoadKw: z.number().positive(),
-  monthlyUnits: z.number().nonnegative(),
-  monthlyAmount: z.number().nonnegative(),
-  billingUnit: z.string().optional(),
-  confidence: z.object({
-    consumerNumber: z.number().min(0).max(1).default(0.98),
-    tariff: z.number().min(0).max(1).default(0.95),
-    sanctionedLoadKw: z.number().min(0).max(1).default(0.91),
-    monthlyUnits: z.number().min(0).max(1).default(0.88),
-    overall: z.enum(["High", "Medium", "Low", "Unclear"]).default("High"),
-  }),
-  extractionNotes: z.string().default("Verified MSEDCL format."),
+  consumerNumber: z.string().min(6).nullable().optional(),
+  tariff: z.string().min(2).nullable().optional(),
+  sanctionedLoadKw: z.number().positive().nullable().optional(),
+  monthlyUnits: z.number().nonnegative().nullable().optional(),
+  monthlyAmount: z.number().nonnegative().nullable().optional(),
+  billingUnit: z.string().nullable().optional(),
 });
 
 /**
  * Extracts structured billing details from an electricity bill image.
  * Uses Google Gemini API if GEMINI_API_KEY is configured.
- * Gracefully falls back to high-fidelity heuristic parsing if running without an API key.
+ * If no provider is configured or reading fails, returns an empty result for manual entry.
  */
 export async function parseElectricityBillWithAI(
   imageBase64: string,
@@ -44,20 +36,12 @@ Analyze this electricity bill image and extract the following details into a str
   "sanctionedLoadKw": number (the connected/sanctioned load in kW),
   "monthlyUnits": number (the current month total units/kWh billed),
   "monthlyAmount": number (the current total bill amount in Rupees),
-  "billingUnit": "string (the billing unit or subdivision or circle)",
-  "confidence": {
-    "consumerNumber": 0.98,
-    "tariff": 0.95,
-    "sanctionedLoadKw": 0.91,
-    "monthlyUnits": 0.88,
-    "overall": "High"
-  },
-  "extractionNotes": "string (brief note explaining what was found or if anything was blurry)"
+  "billingUnit": "string or null (the billing unit or subdivision or circle)"
 }
 
 Rules:
 1. Return ONLY valid JSON, no markdown formatting, no backticks.
-2. If an item cannot be read because the image is blurry, set overall to "Unclear".
+2. If an item cannot be read clearly, return null for that field. Never guess or infer a value.
 3. Keep numbers as pure numeric floats/ints.
 `;
 
@@ -71,7 +55,7 @@ Rules:
               {
                 inlineData: {
                   mimeType,
-                  data: imageBase64.replace(/^data:image\/\w+;base64,/, ""),
+                  data: imageBase64.replace(/^data:[^;]+;base64,/, ""),
                 },
               },
             ],
@@ -88,33 +72,29 @@ Rules:
       if (validated.success) {
         return {
           ...validated.data,
-          billingUnit: validated.data.billingUnit || "Nagpur Urban BU-41 (MSEDCL)",
+          consumerNumber: validated.data.consumerNumber ?? undefined,
+          tariff: validated.data.tariff ?? undefined,
+          sanctionedLoadKw: validated.data.sanctionedLoadKw ?? undefined,
+          monthlyUnits: validated.data.monthlyUnits ?? undefined,
+          monthlyAmount: validated.data.monthlyAmount ?? undefined,
+          billingUnit: validated.data.billingUnit ?? undefined,
+          extractionNotes: "Review the values against your bill before continuing.",
           extractedAt: new Date().toISOString(),
-          rawResponse: responseText,
         };
       }
     } catch (err: unknown) {
-      console.warn("Gemini OCR failed, using fallback parser:", err);
+      console.warn("Bill OCR failed:", err);
     }
   }
 
-  // Graceful Built-In Fallback with explicit per-field confidence scores
+  // Do not invent bill values when OCR is unavailable or fails.
   return {
-    consumerNumber: "4100" + Math.floor(10000000 + Math.random() * 90000000),
-    tariff: "LT-I (Residential Single Phase)",
-    sanctionedLoadKw: 4.0,
-    monthlyUnits: 340,
-    monthlyAmount: 3200,
-    billingUnit: "Nagpur Urban BU-41 (MSEDCL)",
     confidence: {
-      consumerNumber: 0.98,
-      tariff: 0.95,
-      sanctionedLoadKw: 0.91,
-      monthlyUnits: 0.88,
-      overall: "High",
+      overall: "Unclear",
     },
-    extractionNotes:
-      "Extracted via Built-in Vision Parser. Consumer number, 340 units, and ₹3,200 bill identified with high confidence.",
+    extractionNotes: apiKey
+      ? "The bill could not be read. Enter the values manually and check them against the uploaded bill."
+      : "Automatic bill reading is not configured. Enter the values manually and check them against the uploaded bill.",
     extractedAt: new Date().toISOString(),
   };
 }

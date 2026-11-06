@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: solarsaathi
+      POSTGRES_USER: solarsaathi
+      POSTGRES_PASSWORD: local-dev-only-change-before-deploy
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - solarsaathi-postgres:/var/lib/postgresql
+
+volumes:
+  solarsaathi-postgres:

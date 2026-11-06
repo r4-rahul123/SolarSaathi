@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Upload,
   Sparkles,
@@ -13,24 +13,19 @@ import {
   ArrowRight,
   RefreshCw,
   Edit3,
-  ShieldAlert,
-  QrCode,
   ShieldCheck,
-  TrendingUp,
-  Percent,
-  Check,
-  Building,
 } from "lucide-react";
 import { BillExtraction, Lead, OccupancyType, RoofType } from "@/types/solar";
 import { QuoteDisplay } from "./QuoteDisplay";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 
 interface SolarIntakeFormProps {
   onLeadCreated?: (lead: Lead) => void;
 }
-
 export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
   const { t } = useLanguage();
+  const { user, setIsAuthModalOpen } = useAuth();
 
   // Step State: 1 = Details, 2 = AI Bill Verification, 3 = Quote
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -40,139 +35,88 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
-  const [pincode, setPincode] = useState("440015");
+  const [pincode, setPincode] = useState("");
   const [city, setCity] = useState("Nagpur");
   const [occupancy, setOccupancy] = useState<OccupancyType>("Owner");
   const [roofType, setRoofType] = useState<RoofType>("Concrete Flat");
   const [roofAreaSqFt, setRoofAreaSqFt] = useState<number>(650);
+  const [privacyConsent, setPrivacyConsent] = useState(false);
 
   // Bill & AI Extraction State
   const [billImageBase64, setBillImageBase64] = useState<string>("");
-  const [billFileName, setBillFileName] = useState<string>("msedcl_nagpur_bill_sample.pdf");
+  const [billFileName, setBillFileName] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [extraction, setExtraction] = useState<BillExtraction | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isBlurryMock, setIsBlurryMock] = useState<boolean>(false);
 
   // Editable Extracted Fields
-  const [consumerNumber, setConsumerNumber] = useState<string>("410019283741");
-  const [tariff, setTariff] = useState<string>("LT-I (Residential)");
-  const [sanctionedLoad, setSanctionedLoad] = useState<number>(4.0);
-  const [monthlyUnits, setMonthlyUnits] = useState<number>(340);
-  const [monthlyBill, setMonthlyBill] = useState<number>(3200);
+  const [consumerNumber, setConsumerNumber] = useState<string>("");
+  const [tariff, setTariff] = useState<string>("");
+  const [sanctionedLoad, setSanctionedLoad] = useState<number>(0);
+  const [monthlyUnits, setMonthlyUnits] = useState<number>(0);
+  const [monthlyBill, setMonthlyBill] = useState<number>(0);
 
   // Submission State
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [createdLead, setCreatedLead] = useState<Lead | null>(null);
+  const [previewLead, setPreviewLead] = useState<Lead | null>(null);
 
-  // Pre-set helper for evaluators
-  const handleLoadSample = (sampleType: "standard" | "tenant" | "small") => {
-    setIsBlurryMock(false);
-    if (sampleType === "standard") {
-      setName("Prashant Wankhede");
-      setPhone("+91 98231 44521");
-      setEmail("prashant.w@gmail.com");
-      setAddress("Plot 42, Somalwada, Wardha Road");
-      setPincode("440015");
-      setCity("Nagpur");
-      setOccupancy("Owner");
-      setRoofType("Concrete Flat");
-      setRoofAreaSqFt(650);
-      setConsumerNumber("410019283741");
-      setTariff("LT-I (Residential Single Phase)");
-      setSanctionedLoad(4.0);
-      setMonthlyUnits(340);
-      setMonthlyBill(3200);
-      setBillFileName("MSEDCL_Bill_Wankhede_410019283741.pdf");
-      setExtraction({
-        consumerNumber: "410019283741",
-        tariff: "LT-I (Residential Single Phase)",
-        sanctionedLoadKw: 4.0,
-        monthlyUnits: 340,
-        monthlyAmount: 3200,
-        billingUnit: "Nagpur Urban BU-41",
-        confidence: {
-          consumerNumber: 0.98,
-          tariff: 0.95,
-          sanctionedLoadKw: 0.91,
-          monthlyUnits: 0.88,
-          overall: "High",
-        },
-        extractionNotes: "MSEDCL residential bill verified. High consumption (340 kWh/mo) qualifies for priority 3kW setup.",
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("resumeEstimate") !== "1") return;
+    const saved = sessionStorage.getItem("solarsaathi-pending-estimate");
+    if (!saved) return;
+    try {
+      const draft = JSON.parse(saved);
+      queueMicrotask(() => {
+        setName(draft.form.name || "");
+        setPhone(draft.form.phone || "");
+        setEmail(draft.form.email || "");
+        setAddress(draft.form.address || "");
+        setPincode(draft.form.pincode || "");
+        setCity(draft.form.city || "Nagpur");
+        setOccupancy(draft.form.occupancy || "Owner");
+        setRoofType(draft.form.roofType || "Concrete Flat");
+        setRoofAreaSqFt(Number(draft.form.roofAreaSqFt) || 650);
+        setPrivacyConsent(true);
+        setBillFileName(draft.form.billFileName || "");
+        setExtraction(draft.form.extraction || null);
+        setConsumerNumber(draft.form.consumerNumber || "");
+        setTariff(draft.form.tariff || "");
+        setSanctionedLoad(Number(draft.form.sanctionedLoad) || 0);
+        setMonthlyUnits(Number(draft.form.monthlyUnits) || 0);
+        setMonthlyBill(Number(draft.form.monthlyBill) || 0);
+        setPreviewLead(draft.previewLead || null);
+        setStep(3);
+        window.history.replaceState({}, "", `${window.location.pathname}#estimate`);
       });
-    } else if (sampleType === "tenant") {
-      setName("Rohit Meshram");
-      setPhone("+91 97654 32189");
-      setEmail("rohit.meshram@yahoo.com");
-      setAddress("Flat 301, Manish Nagar");
-      setPincode("440025");
-      setCity("Nagpur");
-      setOccupancy("Tenant");
-      setRoofType("Concrete Flat");
-      setRoofAreaSqFt(400);
-      setConsumerNumber("410087654120");
-      setTariff("LT-I (Residential)");
-      setSanctionedLoad(2.0);
-      setMonthlyUnits(210);
-      setMonthlyBill(1900);
-      setBillFileName("Tenant_Rental_Bill_410087654120.pdf");
-      setExtraction({
-        consumerNumber: "410087654120",
-        tariff: "LT-I (Residential)",
-        sanctionedLoadKw: 2.0,
-        monthlyUnits: 210,
-        monthlyAmount: 1900,
-        billingUnit: "Nagpur South",
-        confidence: {
-          consumerNumber: 0.98,
-          tariff: 0.95,
-          sanctionedLoadKw: 0.91,
-          monthlyUnits: 0.88,
-          overall: "High",
-        },
-        extractionNotes: "Rooftop solar requires landlord owner NOC. Diverted to phone consultation desk.",
-      });
-    } else {
-      setName("Ayesha Siddiqui");
-      setPhone("+91 94228 11902");
-      setEmail("ayesha.s@gmail.com");
-      setAddress("House 12, Gittikhadan, Katol Road");
-      setPincode("440013");
-      setCity("Nagpur");
-      setOccupancy("Owner");
-      setRoofType("Tin Shed");
-      setRoofAreaSqFt(300);
-      setConsumerNumber("410055214981");
-      setTariff("LT-I (Residential)");
-      setSanctionedLoad(1.0);
-      setMonthlyUnits(85);
-      setMonthlyBill(650);
-      setBillFileName("MSEDCL_SmallBill_410055214981.pdf");
-      setExtraction({
-        consumerNumber: "410055214981",
-        tariff: "LT-I (Residential)",
-        sanctionedLoadKw: 1.0,
-        monthlyUnits: 85,
-        monthlyAmount: 650,
-        billingUnit: "Nagpur West",
-        confidence: {
-          consumerNumber: 0.98,
-          tariff: 0.95,
-          sanctionedLoadKw: 0.91,
-          monthlyUnits: 0.88,
-          overall: "High",
-        },
-        extractionNotes: "Small bill (<₹800/mo). Payback period is >7 years; unviable for physical survey. Converted to phone advisory.",
-      });
+    } catch {
+      sessionStorage.removeItem("solarsaathi-pending-estimate");
     }
-
-    setStep(2);
-  };
+  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
+      setErrorMsg("Choose a JPG, PNG, WebP or PDF bill file.");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMsg("This file is over 10 MB. Choose a smaller bill photo or PDF.");
+      e.target.value = "";
+      return;
+    }
+
+    setErrorMsg(null);
+    setExtraction(null);
+    setConsumerNumber("");
+    setTariff("");
+    setSanctionedLoad(0);
+    setMonthlyUnits(0);
+    setMonthlyBill(0);
     setBillFileName(file.name);
     const reader = new FileReader();
     reader.onload = async () => {
@@ -180,7 +124,9 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
       setBillImageBase64(base64);
       triggerAIExtraction(base64, file.type);
     };
+    reader.onerror = () => setErrorMsg("Could not open this file. Try choosing it again.");
     reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   const triggerAIExtraction = async (base64Data: string, mimeType: string) => {
@@ -206,73 +152,57 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
       if (ext.monthlyUnits) setMonthlyUnits(ext.monthlyUnits);
       if (ext.monthlyAmount) setMonthlyBill(ext.monthlyAmount);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error reading bill";
-      setErrorMsg(msg);
-      setConsumerNumber("4100" + Math.floor(10000000 + Math.random() * 90000000));
-      setMonthlyUnits(320);
-      setMonthlyBill(3100);
+      const msg = err instanceof Error ? err.message : "The bill could not be read.";
+      setErrorMsg(`${msg} You can enter the values manually below.`);
       setExtraction({
-        confidence: {
-          consumerNumber: 0.65,
-          tariff: 0.6,
-          sanctionedLoadKw: 0.55,
-          monthlyUnits: 0.5,
-          overall: "Medium",
-        },
-        extractionNotes: "AI extraction fallback applied. Please verify values manually below.",
+        confidence: { overall: "Unclear" },
+        extractionNotes: "No values were read. Enter them manually and compare them with the uploaded bill.",
       });
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const handleSubmitLead = async (e: React.FormEvent) => {
+  const buildPayload = () => ({
+    name: name.trim(), phone: phone.trim(), email: email.trim(),
+    address: address.trim() || city, pincode: pincode.trim(), city, occupancy,
+    roofType, roofAreaSqFt: Number(roofAreaSqFt), monthlyBill: Number(monthlyBill),
+    avgUnitsPerMonth: Number(monthlyUnits), billImageName: billFileName,
+    billExtraction: {
+      ...extraction, consumerNumber: consumerNumber || undefined, tariff,
+      sanctionedLoadKw: Number(sanctionedLoad), monthlyUnits: Number(monthlyUnits),
+      monthlyAmount: Number(monthlyBill),
+      extractionNotes: extraction?.extractionNotes || "Values entered by the customer.",
+    },
+  });
+
+  const validateEstimate = (requireBill = true) => {
+    if (!name.trim() || !phone.trim() || monthlyUnits <= 0 || monthlyBill <= 0 || sanctionedLoad <= 0 || !tariff.trim()) {
+      setErrorMsg("Add your contact details and check the bill fields. Monthly units, bill amount, load and tariff are required.");
+      return false;
+    }
+    if (requireBill && !billImageBase64 && !extraction) {
+      setErrorMsg("Upload a bill photo or PDF to continue.");
+      return false;
+    }
+    return true;
+  };
+
+  const handlePreviewEstimate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateEstimate()) return;
     setIsSubmitting(true);
     setErrorMsg(null);
-
     try {
-      const payload = {
-        name: name || "Prashant Wankhede",
-        phone: phone || "+91 98231 44521",
-        email: email || "prashant.w@gmail.com",
-        address: address || "Plot 42, Somalwada, Wardha Road",
-        pincode: pincode || "440015",
-        city: city || "Nagpur",
-        occupancy,
-        roofType,
-        roofAreaSqFt: Number(roofAreaSqFt),
-        monthlyBill: Number(monthlyBill),
-        avgUnitsPerMonth: Number(monthlyUnits),
-        billImageName: billFileName,
-        billExtraction: extraction || {
-          consumerNumber,
-          tariff,
-          sanctionedLoadKw: Number(sanctionedLoad),
-          monthlyUnits: Number(monthlyUnits),
-          monthlyAmount: Number(monthlyBill),
-          confidence: {
-            consumerNumber: 0.98,
-            tariff: 0.95,
-            sanctionedLoadKw: 0.91,
-            monthlyUnits: 0.88,
-            overall: "High",
-          },
-          extractionNotes: "Customer verified and submitted.",
-        },
-      };
-
-      const res = await fetch("/api/leads", {
+      const res = await fetch("/api/leads/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildPayload()),
       });
-
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to submit lead");
-
-      setCreatedLead(data.lead);
-      if (onLeadCreated) onLeadCreated(data.lead);
+      if (!res.ok) throw new Error(data.error || "Could not calculate estimate");
+      setPreviewLead(data.lead);
+      setCreatedLead(null);
       setStep(3);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Submission error";
@@ -282,12 +212,45 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
     }
   };
 
-  if (step === 3 && createdLead) {
-    const breakdown = createdLead.scoreBreakdown;
-    const isHigh = createdLead.score === "High" || breakdown?.tier === "High";
+  const handleSaveEstimate = async () => {
+    if (!user) {
+      sessionStorage.setItem("solarsaathi-pending-estimate", JSON.stringify({
+        form: { name, phone, email, address, pincode, city, occupancy, roofType, roofAreaSqFt, billFileName, extraction, consumerNumber, tariff, sanctionedLoad, monthlyUnits, monthlyBill },
+        previewLead,
+      }));
+      setIsAuthModalOpen(true);
+      return;
+    }
+    if (user.role !== "HOMEOWNER") {
+      setErrorMsg("Please use a homeowner account to save this estimate.");
+      return;
+    }
+    if (!validateEstimate(false)) return;
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildPayload()) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save estimate");
+      setCreatedLead(data.lead);
+      setPreviewLead(null);
+      sessionStorage.removeItem("solarsaathi-pending-estimate");
+      onLeadCreated?.(data.lead);
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Could not save estimate");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (step === 3 && (createdLead || previewLead)) {
+    const displayLead = createdLead || previewLead!;
+    const breakdown = createdLead?.scoreBreakdown;
+    const isHigh = createdLead?.score === "High" || breakdown?.tier === "High";
 
     return (
       <div className="space-y-6">
+        {createdLead && <>
         {/* Status Alert Banner */}
         {isHigh ? (
           <div className="bg-emerald-50 dark:bg-emerald-950/40 border-2 border-[#198754]/40 rounded-3xl p-6 flex flex-col sm:flex-row items-start gap-4 backdrop-blur-sm shadow-md">
@@ -297,17 +260,17 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#198754] text-white">
-                  PRIORITY APPROVED
+                  SURVEY REVIEW
                 </span>
                 <span className="text-xs font-bold text-[#123D2B] dark:text-emerald-300">
                   Ref: #{createdLead.id}
                 </span>
               </div>
               <h4 className="font-black text-[#123D2B] dark:text-emerald-200 text-lg">
-                Priority Rooftop Survey Approved • Eligible for ₹78,000 Central PM Subsidy
+                Strong fit for a site survey
               </h4>
               <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 mt-1 font-medium leading-relaxed">
-                Your monthly consumption of <strong>{createdLead.avgUnitsPerMonth} units</strong> and verified roof ownership qualify you for immediate engineer assignment and same-day net-metering initiation.
+                Based on the details provided, this lead is recommended for a survey review. Subsidy eligibility is checked separately.
               </p>
             </div>
           </div>
@@ -319,21 +282,23 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500 text-white">
-                  TELE-ADVISORY QUEUE
+                  PHONE REVIEW
                 </span>
                 <span className="text-xs font-bold text-amber-900 dark:text-amber-300">
                   Ref: #{createdLead.id}
                 </span>
               </div>
               <h4 className="font-black text-amber-950 dark:text-amber-200 text-lg">
-                Assigned to Solar Tele-Advisory Desk
+                A short phone review is recommended
               </h4>
               <p className="text-xs sm:text-sm text-amber-900 dark:text-amber-300 mt-1 font-medium leading-relaxed">
-                {breakdown?.explanation || createdLead.scoreReason || "Your application is routed for phone advisory."} Our solar consultant will contact you via WhatsApp / phone to evaluate community solar or owner NOC options.
+                {breakdown?.explanation || createdLead.scoreReason || "A team member can discuss the next step with you."} This score guides the next step; it does not reject your request.
               </p>
             </div>
           </div>
         )}
+
+        </>}
 
         {/* 100-POINT TRANSPARENT SCORE BREAKDOWN CARD */}
         {breakdown && (
@@ -341,7 +306,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-[#198754] flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4" /> Transparent Lead Qualification Breakdown
+                  <ShieldCheck className="w-4 h-4" /> How this lead was scored
                 </span>
                 <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-0.5">
                   Solar Fit Score: {breakdown.totalScore} / 100
@@ -357,7 +322,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                         : "bg-amber-100 text-amber-900 border border-amber-300"
                     }`}
                   >
-                    {breakdown.tier === "High" ? "★ High Fit (Survey)" : "Tele-Consult Fit"}
+                    {breakdown.tier === "High" ? "Survey review" : "Phone review"}
                   </span>
                 </div>
               </div>
@@ -427,13 +392,13 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             <div className="p-3.5 bg-[#E7F3EC]/60 dark:bg-[#123D2B]/30 rounded-2xl border border-[#198754]/30 text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2.5">
               <Sparkles className="w-4 h-4 text-[#198754] shrink-0 mt-0.5" />
               <span>
-                <strong>Operational Optimization Note:</strong> Physical site visits in Nagpur cost an estimated <strong>₹2,500 each</strong> in certified engineer time and transit. SolarSaathi automatically qualifies leads so homeowners receive instant transparent recommendations while eliminating wasted visits.
+                This score helps the team decide whether to start with a site survey or a short call. It does not determine subsidy eligibility.
               </span>
             </div>
           </div>
         )}
 
-        <QuoteDisplay lead={createdLead} />
+        <QuoteDisplay lead={displayLead} isPreview={!createdLead} isSavingEstimate={isSubmitting} onSaveEstimate={handleSaveEstimate} />
       </div>
     );
   }
@@ -448,39 +413,14 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
           </div>
           <div>
             <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
-              {step === 1 ? "Step 1: Rooftop Property & Contact" : "Step 2: AI Bill Reader & Side-by-Side Review"}
+                  {step === 1 ? "Step 1: Property & contact" : "Step 2: Review your electricity bill"}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              {step === 1 ? "Takes 60 seconds • Nagpur & Vidarbha PIN codes" : "Gemini Vision OCR extraction from MSEDCL bill"}
+              {step === 1 ? "Homeowner enquiry • Nagpur & Vidarbha" : "Check the values read from your bill"}
             </p>
           </div>
         </div>
 
-        {/* 1-Click Test Presets (For Evaluator Convenience) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 shrink-0">1-Click Presets:</span>
-          <button
-            type="button"
-            onClick={() => handleLoadSample("standard")}
-            className="px-3 py-1.5 text-xs font-bold bg-[#123D2B] hover:bg-[#198754] text-white rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
-          >
-            ★ Sample High (Owner)
-          </button>
-          <button
-            type="button"
-            onClick={() => handleLoadSample("tenant")}
-            className="px-3 py-1.5 text-xs font-bold bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl transition-all cursor-pointer shrink-0"
-          >
-            Sample Tenant
-          </button>
-          <button
-            type="button"
-            onClick={() => handleLoadSample("small")}
-            className="px-3 py-1.5 text-xs font-bold bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl transition-all cursor-pointer shrink-0"
-          >
-            Sample Small Bill
-          </button>
-        </div>
       </div>
 
       <div className="p-6 sm:p-8">
@@ -500,6 +440,14 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 setErrorMsg("Please enter your name and phone number.");
                 return;
               }
+              if (!/^\d{6}$/.test(pincode)) {
+                setErrorMsg("Enter a valid six-digit PIN code.");
+                return;
+              }
+              if (!privacyConsent) {
+                setErrorMsg("Please agree to the use of your details so we can prepare the estimate and contact you.");
+                return;
+              }
               setErrorMsg(null);
               setStep(2);
             }}
@@ -511,7 +459,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 Contact & Installation Address
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                We use your Nagpur address to verify solar irradiation and MSEDCL feeder capacity.
+                Your PIN code helps the team route your enquiry to the right service area.
               </p>
             </div>
 
@@ -523,7 +471,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Prashant Wankhede"
+                  placeholder="Your name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
@@ -537,7 +485,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 <input
                   type="tel"
                   required
-                  placeholder="e.g. +91 98231 44521"
+                    placeholder="e.g. +91 98765 43210"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
@@ -550,7 +498,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 </label>
                 <input
                   type="email"
-                  placeholder="e.g. prashant.w@gmail.com"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
@@ -566,7 +514,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                 >
-                  <option value="Nagpur">Nagpur (Urban / Rural Circle)</option>
+                  <option value="Nagpur">Nagpur</option>
                   <option value="Wardha">Wardha</option>
                   <option value="Amravati">Amravati</option>
                   <option value="Chandrapur">Chandrapur</option>
@@ -591,6 +539,9 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                     placeholder="PIN code"
                     value={pincode}
                     onChange={(e) => setPincode(e.target.value)}
+                    maxLength={6}
+                    inputMode="numeric"
+                    required
                     className="w-32 px-4 py-2.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] font-mono font-bold transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -603,7 +554,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 Rooftop Ownership & Structure
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4 font-medium">
-                Government PM Surya Ghar subsidies require confirmed roof ownership.
+                Ownership affects the next step. Subsidy eligibility is checked separately.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -659,7 +610,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                       Approximate Rooftop Shadow-Free Area (sq. ft.)
                     </label>
                     <span className="font-mono text-xs sm:text-sm font-black text-[#198754] bg-[#E7F3EC] dark:bg-[#123D2B]/50 px-2.5 py-1 rounded-lg border border-[#198754]/30">
-                      {roofAreaSqFt} sq. ft. (~{(roofAreaSqFt / 100).toFixed(1)} kW capacity)
+                      {roofAreaSqFt} sq. ft. (~{(roofAreaSqFt / 100).toFixed(1)} kW guide)
                     </span>
                   </div>
                   <input
@@ -675,6 +626,16 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
               </div>
             </div>
 
+            <label className="flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-xs leading-5 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={privacyConsent}
+                onChange={(e) => setPrivacyConsent(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-[#198754]"
+              />
+              <span>I agree that my contact details and electricity-bill information can be used to prepare this estimate and contact me about my enquiry.</span>
+            </label>
+
             <div className="flex justify-end pt-4">
               <button
                 type="submit"
@@ -689,7 +650,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
         {/* STEP 2: Bill Upload & AI Side-by-Side Review Workstation */}
         {step === 2 && (
-          <form onSubmit={handleSubmitLead} className="space-y-6">
+          <form onSubmit={handlePreviewEstimate} className="space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -697,7 +658,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                   MSEDCL Electricity Bill Analysis
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                  AI reads your 12-digit consumer number, sanctioned load, and units. You can verify and edit all values.
+                  We will try to read the bill. Check or enter the values before continuing.
                 </p>
               </div>
 
@@ -733,13 +694,13 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 <div>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white block">
                     {isAnalyzing
-                      ? "AI is analyzing electricity bill..."
+                      ? "Reading bill…"
                       : billFileName
                       ? `Selected: ${billFileName}`
                       : t("uploadBill")}
                   </span>
                   <p className="text-xs text-slate-400 mt-1 font-medium">
-                    Fast OCR via Gemini Vision • JPG, PNG or PDF
+                    JPG, PNG, WebP or PDF • Max 10 MB
                   </p>
                 </div>
               </label>
@@ -755,113 +716,29 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsBlurryMock(!isBlurryMock)}
-                    className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white underline cursor-pointer"
-                  >
-                    {isBlurryMock ? "Simulate Clear Photo" : "Simulate Blurry Photo"}
-                  </button>
-                  <span
-                    className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border ${
-                      isBlurryMock
-                        ? "text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 border-amber-300"
-                        : "text-[#123D2B] dark:text-emerald-300 bg-[#E7F3EC] dark:bg-emerald-950/80 border-[#198754]/40"
-                    }`}
-                  >
-                    {isBlurryMock ? "⚠ Low Confidence" : "✓ High Confidence (98%)"}
-                  </span>
-                </div>
+                <span className="text-xs text-slate-500 dark:text-slate-400">Check the bill fields before continuing.</span>
               </div>
 
-              {isBlurryMock && (
-                <div className="p-4 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-2xl text-xs sm:text-sm text-amber-900 dark:text-amber-200 flex items-center gap-3 font-medium">
-                  <ShieldAlert className="w-5 h-5 shrink-0 text-amber-500" />
-                  <span>
-                    <strong>Blurry Photo Notice:</strong> Some values could not be read clearly. Confidence scores have dropped. Please confirm or edit the numbers manually below before proceeding.
-                  </span>
-                </div>
+              {extraction?.extractionNotes && (
+                <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  {extraction.extractionNotes}
+                </p>
               )}
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left Column: Authentic MSEDCL Bill Document Preview */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 text-xs font-mono space-y-3">
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800">
-                    <div>
-                      <span className="font-black text-slate-900 dark:text-white block text-sm">
-                        महावितरण (MSEDCL)
-                      </span>
-                      <span className="text-[11px] text-slate-400">Nagpur Urban Circle • BU 41</span>
+                <div className="flex min-h-72 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                  {billImageBase64 && billImageBase64.startsWith("data:image/") ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={billImageBase64} alt="Uploaded electricity bill" className="max-h-[520px] w-full object-contain" />
+                  ) : billImageBase64 && billImageBase64.startsWith("data:application/pdf") ? (
+                    <iframe title="Uploaded electricity bill PDF" src={billImageBase64} className="h-[520px] w-full" />
+                  ) : (
+                    <div className="px-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                      <FileText className="mx-auto mb-3 h-8 w-8 text-slate-400" />
+                      <p className="font-medium">{billFileName || "No bill uploaded"}</p>
+                      <p className="mt-1 text-xs">{billImageBase64 ? "Preview is unavailable for this file." : "Upload a bill photo or PDF to preview it here."}</p>
                     </div>
-                    <span className="text-[11px] bg-[#E7F3EC] dark:bg-[#123D2B]/50 text-[#123D2B] dark:text-emerald-300 px-2.5 py-1 rounded-lg border border-[#198754]/30 font-bold">
-                      LT-I RESIDENTIAL
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-sans flex items-center gap-1.5">
-                        Consumer No:
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-                          {isBlurryMock ? "42%" : "98%"}
-                        </span>
-                      </span>
-                      <span className="font-bold text-[#123D2B] dark:text-emerald-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-sm">
-                        {consumerNumber || "410019283741"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-sans">Consumer Name:</span>
-                      <span className="font-bold text-slate-800 dark:text-slate-100">{name || "Prashant Wankhede"}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-sans flex items-center gap-1.5">
-                        Sanctioned Load:
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-                          {isBlurryMock ? "35%" : "91%"}
-                        </span>
-                      </span>
-                      <span className="font-bold text-slate-800 dark:text-slate-100">{sanctionedLoad} kW</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-sans flex items-center gap-1.5">
-                        Billed Units (kWh):
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-                          {isBlurryMock ? "48%" : "88%"}
-                        </span>
-                      </span>
-                      <span className="font-black text-[#198754] dark:text-emerald-400 bg-[#E7F3EC] dark:bg-[#123D2B]/50 px-2 py-0.5 rounded-md text-sm">
-                        {monthlyUnits} Units
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-sans flex items-center gap-1.5">
-                        Tariff Category:
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-                          {isBlurryMock ? "40%" : "95%"}
-                        </span>
-                      </span>
-                      <span className="font-bold text-slate-800 dark:text-slate-200">
-                        {tariff}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-sans">Monthly Bill Amount:</span>
-                      <span className="font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-sm">
-                        ₹{monthlyBill}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                    <span className="flex items-center gap-1 font-sans">
-                      <QrCode className="w-3.5 h-3.5 text-[#198754]" /> Barcode Verified
-                    </span>
-                    <span className="truncate max-w-[140px]">{billFileName}</span>
-                  </div>
+                  )}
                 </div>
-
                 {/* Right Column: Active Editable Form (When AI is wrong/human in the loop) */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -878,7 +755,6 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                         <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                           Consumer Number (12 digits)
                         </label>
-                        <span className="text-[10px] text-[#198754] font-bold">Confidence: {isBlurryMock ? "42%" : "98%"}</span>
                       </div>
                       <input
                         type="text"
@@ -894,11 +770,12 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                           <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                             Monthly Units (kWh) *
                           </label>
-                          <span className="text-[10px] text-[#198754] font-bold">{isBlurryMock ? "48%" : "88%"}</span>
                         </div>
                         <input
-                          type="number"
-                          value={monthlyUnits}
+                        type="number"
+                          required
+                          min="1"
+                          value={monthlyUnits || ""}
                           onChange={(e) => setMonthlyUnits(Number(e.target.value))}
                           className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-black text-[#198754] dark:text-emerald-400 border border-slate-300 dark:border-slate-700 rounded-xl focus:border-[#198754] focus:outline-none bg-white dark:bg-slate-950"
                         />
@@ -910,7 +787,9 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                         </label>
                         <input
                           type="number"
-                          value={monthlyBill}
+                          required
+                          min="1"
+                          value={monthlyBill || ""}
                           onChange={(e) => setMonthlyBill(Number(e.target.value))}
                           className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-black text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl focus:border-[#198754] focus:outline-none bg-white dark:bg-slate-950"
                         />
@@ -923,12 +802,13 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                           <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                             Sanctioned Load (kW)
                           </label>
-                          <span className="text-[10px] text-[#198754] font-bold">{isBlurryMock ? "35%" : "91%"}</span>
                         </div>
                         <input
                           type="number"
+                          required
+                          min="0.1"
                           step="0.5"
-                          value={sanctionedLoad}
+                          value={sanctionedLoad || ""}
                           onChange={(e) => setSanctionedLoad(Number(e.target.value))}
                           className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl focus:border-[#198754] focus:outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                         />
@@ -939,7 +819,6 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                           <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                             Tariff Category
                           </label>
-                          <span className="text-[10px] text-[#198754] font-bold">{isBlurryMock ? "40%" : "95%"}</span>
                         </div>
                         <input
                           type="text"
@@ -965,17 +844,17 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isAnalyzing}
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#123D2B] hover:bg-[#198754] text-white rounded-2xl font-black text-sm shadow-lg shadow-[#123D2B]/20 transition-all hover:scale-[1.02] disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Calculating PM Subsidy & Payback...</span>
+                    <span>Calculating estimate…</span>
                   </>
                 ) : (
                   <>
-                    <span>Generate Instant Solar Quote & Subsidy</span>
+                    <span>Prepare estimate</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
