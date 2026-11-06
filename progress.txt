@@ -1,0 +1,42 @@
+# Ralph Loop Execution Journal (progress.txt)
+
+Project: SolarSaathi (Rooftop Solar Platform)
+Repository: isolab (Next.js 16.4.4 App Router)
+
+--------------------------------------------------------------------------------
+[Iteration 1] Core Financial Calculation Engine
+- Built PM Surya Ghar formula in src/lib/solar-calculator.ts.
+- Added 1,400 kWh/kW/yr benchmark, payback math, and 100-point transparent lead scoring.
+- Verification: npm test passing 4/4 suites.
+
+--------------------------------------------------------------------------------
+[Iteration 2] AI Bill Intake & Side-by-Side Review Workstation
+- Integrated Gemini 2.5 Flash Vision OCR with confidence scores in src/lib/gemini-ocr.ts.
+- Built side-by-side verification with authentic MSEDCL bill card and blurry bill simulator.
+- Verification: 1-click test presets tested for Owner High, Tenant, and Small Bill.
+
+--------------------------------------------------------------------------------
+[Iteration 3] Design System & Photorealistic Imagery
+- Applied SolarSaathi brand colors (#123D2B, #198754, #E7F3EC, #263238).
+- Built Dribbble-inspired split-card login/signup page with vector art.
+- Mounted photorealistic rooftop solar installation and certified surveyor imagery.
+- Verification: Verified dark/light mode toggle with zero hydration flickers.
+
+--------------------------------------------------------------------------------
+[Iteration 4] Staff Operations CRM & Pricing Master
+- Added Stuck Projects Dashboard for projects inactive >7 days (PR-1025, PR-1026).
+- Added Turnkey Base Installation Pricing table (1kW, 2kW, 3kW) alongside dated subsidy rules.
+- Added automated WhatsApp & SMS audit log stream.
+
+--------------------------------------------------------------------------------
+[Iteration 5] Public Milestone Tracker & DPDP Masking
+- Built 8-stage Swiggy-style visual tracker at /track/[id].
+- Masked consumer IDs (4100****3741) for DPDP privacy compliance.
+- Added site inspection photos and notification history tabs.
+
+--------------------------------------------------------------------------------
+[Iteration 6] GSD Framework & Ralph Loop Setup
+- Installed Get Shit Done (GSD) plugin in .agents/plugins/get-shit-done/.
+- Initialized .planning/ state directory (PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md).
+- Initialized Ralph Loop configuration files (PRD.md, prompt.md, progress.txt).
+- Verification: npm test 4/4 suites passing, npm run build compiling 18/18 routes with exit code 0.
