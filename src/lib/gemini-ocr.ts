@@ -27,9 +27,14 @@ export async function parseElectricityBillWithAI(
   if (apiKey) {
     const ai = new GoogleGenAI({
       apiKey,
-      httpOptions: { timeout: 20_000, retryOptions: { attempts: 1 } },
+      // Synthetic bill verification showed the supported Flash model can take ~25s.
+      // Keep each attempt below the route's 60s platform limit.
+      httpOptions: {
+        timeout: 28_000,
+        retryOptions: { attempts: 2, initialDelay: 0.5, maxDelay: 1, jitter: 0 },
+      },
     });
-    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const model = "gemini-3.6-flash";
     const prompt = `
 You are an expert OCR and data extractor for Indian electricity distribution utility bills (MSEDCL / Mahavitaran, Adani Electricity, Tata Power, BESCOM, etc.).
 Analyze this electricity bill image and extract the following details into a strict JSON object:
@@ -48,31 +53,29 @@ Rules:
 3. Keep numbers as pure numeric floats/ints.
 `;
 
-    for (const [index, model] of models.entries()) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { text: prompt },
-                {
-                  inlineData: {
-                    mimeType,
-                    data: imageBase64.replace(/^data:[^;]+;base64,/, ""),
-                  },
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType,
+                  data: imageBase64.replace(/^data:[^;]+;base64,/, ""),
                 },
-              ],
-            },
-          ],
-        });
+              },
+            ],
+          },
+        ],
+      });
 
-        const responseText = response.text?.trim() || "";
-        if (!responseText) {
-          failureDetail = `${model} returned an empty response.`;
-          continue;
-        }
+      const responseText = response.text?.trim() || "";
+      if (!responseText) {
+        failureDetail = "Gemini returned an empty response.";
+      } else {
         const cleanedJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
 
         const parsed = JSON.parse(cleanedJson);
@@ -91,20 +94,24 @@ Rules:
             extractedAt: new Date().toISOString(),
           };
         }
-        failureDetail = `${model} response fields were invalid: ${validated.error.issues.map((issue) => issue.path.join(".") || "response").join(", ")}.`;
-      } catch (err: unknown) {
-        const rawMessage = err instanceof Error ? err.message : "Gemini request failed.";
-        failureDetail = rawMessage
-          .replaceAll(apiKey, "[redacted]")
-          .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")
-          .replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]")
-          .replace(/[\r\n]+/g, " ")
-          .slice(0, 220) || "Gemini request failed.";
-        console.warn("Bill OCR failed with model:", model, failureDetail);
-
-        const canFallback = index < models.length - 1 && (err instanceof SyntaxError || /(?:\b503\b|\b429\b|\b500\b|\b502\b|\b504\b|UNAVAILABLE|high demand|model.*not available)/i.test(rawMessage));
-        if (!canFallback) break;
+        failureDetail = `Gemini returned unreadable fields (${validated.error.issues.map((issue) => issue.path.join(".") || "response").join(", ")}).`;
       }
+    } catch (err: unknown) {
+      const status = typeof err === "object" && err !== null && "status" in err
+        ? Number((err as { status?: unknown }).status)
+        : 0;
+      const errorName = err instanceof Error ? err.name : "";
+      const rawMessage = err instanceof Error ? err.message : "";
+      if (errorName === "AbortError" || status === 408 || status === 504 || /operation was aborted|deadline exceeded|timed? ?out/i.test(rawMessage)) {
+        failureDetail = "Gemini took too long to read the bill. Retry the reading in a moment.";
+      } else if (status === 429 || status === 500 || status === 502 || status === 503) {
+        failureDetail = "Gemini is temporarily busy. Retry the reading in a moment.";
+      } else if (status === 401 || status === 403) {
+        failureDetail = "Gemini API access was denied. Check the API key and model access.";
+      } else {
+        failureDetail = "Gemini could not read this bill. Check API access and try again.";
+      }
+      console.warn("Bill OCR request did not complete:", { model, status: status || undefined, reason: failureDetail });
     }
   }
 
@@ -114,7 +121,7 @@ Rules:
       overall: "Unclear",
     },
     extractionNotes: apiKey
-      ? `The bill could not be read (${failureDetail}). Check Gemini API access and try again, or enter the values manually.`
+      ? `${failureDetail} Retry automatic reading or enter and check the values manually.`
       : "Automatic bill reading is not configured. Enter the values manually and check them against the uploaded bill.",
     extractedAt: new Date().toISOString(),
   };

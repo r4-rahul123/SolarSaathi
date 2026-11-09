@@ -1,36 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SolarSaathi
 
-## Getting Started
+SolarSaathi helps homeowners review rooftop-solar estimates and track projects across Nagpur & Vidarbha.
 
-First, run the development server:
+## Local setup
+
+Requirements: Node.js 22.9+ and PostgreSQL (or Docker Desktop with Compose).
 
 ```bash
+npm ci
+npm run db:setup
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Before running these commands, copy `.env.example` to `.env.local`, set `DATABASE_URL`, and start PostgreSQL. Detailed fresh-machine, E2E and deployment steps are in [deployment.md](./deployment.md) and [POSTGRES.md](./POSTGRES.md). Create a homeowner login at `/signup`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The deterministic test command is `node --experimental-strip-types tests/run-tests.mjs` (26/26 passed on 2026-11-09). In the current Windows/Codex environment, the `npm test` wrapper returned exit code 1 without diagnostics; see [TDD.md](./TDD.md).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Business support
 
-## Learn More
+- Email: [solarsaathi9@gmail.com](mailto:solarsaathi9@gmail.com)
+- Phone support: currently unavailable - Demo
+- WhatsApp support: Coming Soon
+- Contact: SolarSaathi Support Team
+- Service area: Nagpur & Vidarbha
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The email link opens the visitor's default email application; it does not send mail automatically. Contact details are centralized in `src/config/business.ts`.
+The same support information is available from the global footer and the `/contact` page.

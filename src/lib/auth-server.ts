@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { getPostgresPool } from "@/lib/postgres";
 import type { UserRole } from "@/context/AuthContext";
+import type { PoolClient } from "pg";
 
 const SESSION_COOKIE = "solarsaathi-session";
 const SESSION_DAYS = 30;
@@ -14,42 +15,37 @@ export interface SessionUser {
   role: UserRole;
 }
 
-declare global {
-  var __memorySessions: Map<string, { user: SessionUser; expiresAt: Date }> | undefined;
-}
-
-function getMemorySessions() {
-  if (!globalThis.__memorySessions) {
-    globalThis.__memorySessions = new Map();
-  }
-  return globalThis.__memorySessions;
-}
-
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
-export async function createUserSession(userId: string, demoUser?: SessionUser) {
-  const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+export function createSessionCredential() {
+  return {
+    token: randomBytes(32).toString("base64url"),
+    expiresAt: new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000),
+  };
+}
 
-  try {
-    await getPostgresPool().query(
-      "INSERT INTO app_sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
-      [hashToken(token), userId, expiresAt],
-    );
-  } catch (err) {
-    if (demoUser) {
-      getMemorySessions().set(hashToken(token), { user: demoUser, expiresAt });
-    }
-  }
+export async function insertSessionRecord(client: Pick<PoolClient, "query">, userId: string, session: ReturnType<typeof createSessionCredential>) {
+  await client.query(
+    "INSERT INTO app_sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
+    [hashToken(session.token), userId, session.expiresAt],
+  );
+}
 
+export async function setSessionCookie(session: ReturnType<typeof createSessionCredential>) {
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, token, {
+  cookieStore.set(SESSION_COOKIE, session.token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    expires: expiresAt,
+    expires: session.expiresAt,
   });
+}
+
+export async function createUserSession(userId: string) {
+  const session = createSessionCredential();
+  await insertSessionRecord(getPostgresPool(), userId, session);
+  await setSessionCookie(session);
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
@@ -64,16 +60,11 @@ export async function getSessionUser(): Promise<SessionUser | null> {
        WHERE s.token_hash = $1 AND s.expires_at > NOW()`,
       [hashToken(token)],
     );
-    if (rows[0]) return rows[0];
-  } catch (err) {
-    // Database connection failed, fall back to in-memory sessions
+    return rows[0] ?? null;
+  } catch {
+    // Fail closed when the database is unavailable.
+    return null;
   }
-
-  const memSession = getMemorySessions().get(hashToken(token));
-  if (memSession && memSession.expiresAt > new Date()) {
-    return memSession.user;
-  }
-  return null;
 }
 
 export async function destroyUserSession() {
@@ -85,7 +76,6 @@ export async function destroyUserSession() {
     } catch {
       // Ignore error if database unreachable
     }
-    getMemorySessions().delete(hashToken(token));
   }
   cookieStore.delete(SESSION_COOKIE);
 }

@@ -18,7 +18,7 @@
 - [x] Task 2.1: Implement Gemini 2.5 Flash Vision OCR parser with Zod validation.
 - [x] Task 2.2: Add field-level confidence ratings (Consumer # 98%, Tariff 95%, Load 91%, Units 88%).
 - [x] Task 2.3: Build side-by-side verification document with simulated blurry bill handling.
-- [x] Task 2.4: Add 1-click test presets (Prashant Wankhede, Rohit Meshram, Ayesha Siddiqui).
+- [x] Task 2.4: Add one-click illustrative homeowner scenarios with non-deliverable sample contact fields.
 
 ### Phase 3: Brand Identity, Visual UI & Photorealistic Imagery
 - [x] Task 3.1: Apply SolarSaathi color scheme (`#123D2B`, `#198754`, `#E7F3EC`, `#263238`).

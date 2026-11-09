@@ -1,32 +1,36 @@
-# Local PostgreSQL setup
+# PostgreSQL setup
 
-This project uses PostgreSQL for user accounts, sessions, enquiries, and pricing rules.
+PostgreSQL is required for homeowner signup/login, sessions and persistent application data.
 
-## Connect an existing PostgreSQL installation
+## Use an existing PostgreSQL installation
 
-1. In pgAdmin, create a database named `solarsaathi` (or choose an existing database).
-2. Copy `.env.example` to `.env.local` and set `DATABASE_URL` to match your PostgreSQL host, port, database, username and password. Keep this file private and out of Git.
-3. Run `npm run db:setup` to create the application tables.
-4. Run `npm run dev`.
+1. In pgAdmin, create a database, for example `solarsaathi`.
+2. Copy `.env.example` to `.env.local` and edit `DATABASE_URL` with the host, port, database, username and password for your PostgreSQL instance. Keep `.env.local` private and out of Git.
+3. From the project root, run `npm run db:setup`. This applies `database/schema.sql` to initialize the application tables.
+4. Run `npm run dev` and create a homeowner account at `/signup`.
 
-If you prefer Docker, `docker compose up -d postgres` starts a separate development database on `127.0.0.1:55432`. Its password is for local use only; update `DATABASE_URL` to match and never use it in a shared or deployed environment.
+## Use the included local Docker database
 
-## Accounts and roles
+With Docker Desktop running, execute:
 
-Public signup creates homeowner accounts. Staff roles must be provisioned by an authorized operator. `npm run db:seed-demo` is an optional local development helper for testing staff screens; it refuses to run in production and should not be used with a shared database.
-
-## Password reset email
-
-Forgot password sends a 6-digit code to the account email. SMTP must be configured in `.env.local` (do not commit or share that file), then restart the Next.js dev server:
-
-```env
-PASSWORD_RESET_SECRET=use-a-random-secret-with-at-least-32-characters
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-sending-email@example.com
-SMTP_PASS=your-email-provider-app-password
-SMTP_FROM=SolarSaathi <your-sending-email@example.com>
+```bash
+docker compose up -d postgres
 ```
 
-For Gmail, use an App Password from the Google account that sends the mail; the regular account password will not work. For another provider, use its SMTP host, port, and TLS settings. The OTP table is created by `npm run db:setup`.
+The database is bound to `127.0.0.1:55432`; the local connection string in `.env.example` matches the Compose defaults. These credentials are for local development only. Change the Compose password and connection string before using a shared environment.
+
+## Account roles
+
+Public signup creates homeowner accounts. There are no default staff accounts or passwords. For local staff-screen evaluation, an authorized database operator can create an account through signup and assign its role in pgAdmin:
+
+```sql
+UPDATE app_users
+SET role = 'SALES', updated_at = NOW()
+WHERE email = 'the-account-created-above@example.com';
+```
+
+Allowed roles are `HOMEOWNER`, `SALES`, `SURVEYOR` and `COORDINATOR`. Only provision accounts you control; do not run this against shared/production data unless authorized. Public role assignment remains unavailable.
+
+## Password-reset email (optional)
+
+Forgot-password OTP delivery requires SMTP settings in `.env.local`. For Gmail, use an App Password rather than the regular account password. Configure `PASSWORD_RESET_SECRET` with a random value of at least 32 characters. Restart the app after changing environment variables. The OTP storage table is created by `npm run db:setup`.

@@ -1,5 +1,6 @@
 import "server-only";
 import nodemailer from "nodemailer";
+import { BUSINESS_CONTACT } from "@/config/business";
 
 function getMailConfig() {
   const host = process.env.SMTP_HOST;
@@ -41,10 +42,11 @@ export async function sendPasswordResetOtp(email: string, name: string, otp: str
 
   await transporter.sendMail({
     from: config.from,
+    replyTo: BUSINESS_CONTACT.supportEmail,
     to: email,
     subject: "Your SolarSaathi password reset code",
-    text: `Hi ${name},\n\nYour password reset code is ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`,
-    html: `<p>Hi ${escapeHtml(name)},</p><p>Your SolarSaathi password reset code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">${otp}</p><p>This code expires in 10 minutes. If you did not request this, ignore this email.</p>`,
+    text: `Hi ${name},\n\nYour password reset code is ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.\n\nQuestions? Contact ${BUSINESS_CONTACT.contactPerson} at ${BUSINESS_CONTACT.supportEmail}.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>Your SolarSaathi password reset code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">${otp}</p><p>This code expires in 10 minutes. If you did not request this, ignore this email.</p><p>Questions? Contact ${escapeHtml(BUSINESS_CONTACT.contactPerson)} at <a href="mailto:${BUSINESS_CONTACT.supportEmail}">${BUSINESS_CONTACT.supportEmail}</a>.</p>`,
   });
 }
 

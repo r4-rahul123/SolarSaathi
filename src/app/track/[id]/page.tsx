@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { SolarDB } from "@/lib/db";
 import { TrackProjectClient } from "@/components/TrackProjectClient";
 import { getSessionUser } from "@/lib/auth-server";
+import { hideLeadScoring } from "@/lib/lead-privacy";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -24,5 +25,5 @@ export default async function TrackProjectPage({ params }: PageProps) {
 
   if (!isStaff && !isOwner && !isUnclaimedQuoteLink) notFound();
 
-  return <TrackProjectClient initialLead={lead} />;
+  return <TrackProjectClient initialLead={isStaff ? lead : hideLeadScoring(lead)} />;
 }

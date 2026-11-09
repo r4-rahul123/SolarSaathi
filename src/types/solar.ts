@@ -13,6 +13,7 @@ export interface ScoreBreakdown {
   totalScore: number;           // 0 - 100
   tier: LeadScoreCategory;      // Assumed bands: 70+ High, 40-69 Medium, below 40 Low
   explanation: string;
+  reasonCodes?: string[];
 }
 
 export type ProjectStage =
@@ -59,7 +60,7 @@ export interface QuoteOption {
   annualGenerationUnits: number;
   annualSavings: number;
   monthlySavings: number;
-  paybackYears: number;
+  paybackYears: number | null;
   lifetimeSavings25Yrs: number;
   isRecommended?: boolean;
 }
@@ -74,6 +75,8 @@ export interface SolarQuote {
     ruleName: string;
     effectiveDate: string;
     maxCap: number;
+    tier1RatePerKw: number;
+    tier2RatePerKw: number;
     generationFactor: number;
     tariffAssumption: number;
   };
@@ -90,13 +93,22 @@ export interface ProjectMilestone {
   isCurrent?: boolean;
 }
 
+export type NotificationChannel = "WhatsApp Mock" | "SMS Mock" | "WhatsApp" | "SMS";
+export type NotificationStatus = "Sent (Mock)" | "Sent Mock" | "Failed" | "PREVIEW";
+
 export interface MockNotification {
   id: string;
-  channel: "WhatsApp" | "SMS";
+  projectId: string;
+  customerId?: string;
+  customerName?: string;
+  channel: NotificationChannel;
   recipient: string;
   message: string;
-  sentAt: string;
-  status: "PREVIEW";
+  status: NotificationStatus;
+  stage: ProjectStage;
+  createdAt: string;
+  sentAt?: string;
+  readAt?: string | null;
 }
 
 export interface Lead {
@@ -117,7 +129,7 @@ export interface Lead {
   billImageName?: string;
   billExtraction?: BillExtraction;
   recommendedKw: number;
-  scoreBreakdown: ScoreBreakdown;
+  scoreBreakdown?: ScoreBreakdown;
   score?: LeadScoreCategory;
   scoreReason?: string;
   status: ProjectStage;

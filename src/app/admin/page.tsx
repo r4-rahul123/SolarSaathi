@@ -14,18 +14,27 @@ import {
   Save,
   IndianRupee,
   Check,
+  MessageSquare,
+  Clock,
+  Filter,
 } from "lucide-react";
-import { Lead, SubsidyRule, PricingRule, ProjectStage, NextAction } from "@/types/solar";
+import { Lead, SubsidyRule, PricingRule, ProjectStage, NextAction, MockNotification } from "@/types/solar";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { SolarSaathiLogo } from "@/components/SolarSaathiLogo";
+import { PaymentsSection } from "@/components/PaymentsSection";
 
 export default function AdminDashboardPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [rules, setRules] = useState<SubsidyRule[]>([]);
-  const [activeTab, setActiveTab] = useState<"leads" | "stuck" | "rules" | "analytics">("leads");
+  const [notifications, setNotifications] = useState<MockNotification[]>([]);
+  const [notifSearch, setNotifSearch] = useState("");
+  const [notifChannelFilter, setNotifChannelFilter] = useState("ALL");
+  const [notifStatusFilter, setNotifStatusFilter] = useState("ALL");
+  const [isNotifsLoading, setIsNotifsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"leads" | "stuck" | "payments" | "notifications" | "rules" | "analytics">("leads");
   const [filterScore, setFilterScore] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -89,10 +98,25 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchNotifications = async () => {
+    setIsNotifsLoading(true);
+    try {
+      const res = await fetch("/api/notifications", { cache: "no-store" });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.notifications)) {
+        setNotifications(data.notifications);
+      }
+    } catch (e) {
+      console.error("Failed to load notifications:", e);
+    } finally {
+      setIsNotifsLoading(false);
+    }
+  };
+
   const retryDashboardLoad = () => {
     setLoadError("");
     setIsLoading(true);
-    void Promise.all([fetchLeads(), fetchRules()]).finally(() => setIsLoading(false));
+    void Promise.all([fetchLeads(), fetchRules(), fetchNotifications()]).finally(() => setIsLoading(false));
   };
 
   useEffect(() => {
@@ -104,7 +128,7 @@ export default function AdminDashboardPage() {
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
-      void Promise.all([fetchLeads(), fetchRules()]).finally(() => {
+      void Promise.all([fetchLeads(), fetchRules(), fetchNotifications()]).finally(() => {
         if (active) setIsLoading(false);
       });
     });
@@ -138,6 +162,7 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       if (data.lead) {
         fetchLeads();
+        fetchNotifications();
         if (selectedLead && selectedLead.id === leadId) {
           setSelectedLead(data.lead);
         }
@@ -217,7 +242,7 @@ export default function AdminDashboardPage() {
 
   const currentRole = user?.role;
 
-  if (isAuthLoading || isLoading) {
+  if (isAuthLoading || isLoading || !user || user.role === "HOMEOWNER") {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-7xl items-center justify-center px-4">
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 text-sm font-medium text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
@@ -273,6 +298,28 @@ export default function AdminDashboardPage() {
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>Stuck Projects ({stuckLeads.length})</span>
+          </button>
+
+          {(currentRole === "SALES" || currentRole === "COORDINATOR") && <button
+            onClick={() => setActiveTab("payments")}
+            className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${activeTab === "payments" ? "bg-white dark:bg-slate-800 text-[#123D2B] dark:text-white shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
+          ><IndianRupee className="h-3.5 w-3.5" /> Payments</button>}
+
+          <button
+            onClick={() => setActiveTab("notifications")}
+            className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "notifications"
+                ? "bg-white dark:bg-slate-800 text-[#123D2B] dark:text-white shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            }`}
+          >
+            <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Mock Notifications</span>
+            {notifications.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-mono">
+                {notifications.length}
+              </span>
+            )}
           </button>
 
           {currentRole === "COORDINATOR" && (
@@ -502,6 +549,193 @@ export default function AdminDashboardPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {activeTab === "payments" && (currentRole === "SALES" || currentRole === "COORDINATOR") && <PaymentsSection />}
+
+      {/* TAB: MOCK NOTIFICATIONS */}
+      {activeTab === "notifications" && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm">
+          {/* Header & Prominent Disclaimer */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                    <MessageSquare className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
+                      WhatsApp Mock Notification Center
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                      Audit trail of automated customer notifications triggered on project status transitions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={fetchNotifications}
+                className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                Refresh Notifications
+              </button>
+            </div>
+
+            {/* Simulation Warning Banner */}
+            <div className="rounded-2xl border-2 border-dashed border-emerald-400/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 text-xs font-semibold text-emerald-950 dark:text-emerald-200 flex items-start gap-3">
+              <span className="shrink-0 mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-700 text-white tracking-wider">
+                Simulated Notification
+              </span>
+              <span>
+                <strong>Zero External Charges:</strong> This is an internal mock notification engine. No real WhatsApp Business API, SMS gateway, or Twilio integration is connected. No actual messages are transmitted to customers.
+              </span>
+            </div>
+          </div>
+
+          {/* Search & Filters */}
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by customer name, project ID, or message text..."
+                value={notifSearch}
+                onChange={(e) => setNotifSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-700 rounded-xl focus:border-emerald-600 focus:outline-none bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                <Filter className="w-3 h-3" /> Channel:
+              </span>
+              <select
+                value={notifChannelFilter}
+                onChange={(e) => setNotifChannelFilter(e.target.value)}
+                className="px-3 py-2 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none"
+              >
+                <option value="ALL">All Channels</option>
+                <option value="WhatsApp Mock">WhatsApp Mock</option>
+                <option value="SMS Mock">SMS Mock</option>
+              </select>
+
+              <span className="text-xs font-bold text-slate-500">Status:</span>
+              <select
+                value={notifStatusFilter}
+                onChange={(e) => setNotifStatusFilter(e.target.value)}
+                className="px-3 py-2 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 focus:outline-none"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="Sent (Mock)">Sent (Mock)</option>
+                <option value="Failed">Failed</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Notifications List */}
+          {isNotifsLoading ? (
+            <div className="py-12 text-center text-sm font-medium text-slate-500">
+              Loading mock notifications...
+            </div>
+          ) : (
+            (() => {
+              const filtered = notifications.filter((n) => {
+                const q = notifSearch.toLowerCase();
+                const matchSearch =
+                  !q ||
+                  (n.customerName || "").toLowerCase().includes(q) ||
+                  n.projectId.toLowerCase().includes(q) ||
+                  n.message.toLowerCase().includes(q) ||
+                  (n.stage || "").toLowerCase().includes(q);
+                const matchChannel =
+                  notifChannelFilter === "ALL" || n.channel === notifChannelFilter;
+                const matchStatus =
+                  notifStatusFilter === "ALL" || n.status === notifStatusFilter;
+                return matchSearch && matchChannel && matchStatus;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-12 text-center text-slate-500">
+                    <p className="font-semibold text-sm">No mock notifications match your criteria.</p>
+                    <p className="text-xs text-slate-400 mt-1">Notifications are generated automatically when a project status changes.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-4">
+                  {filtered.map((notif) => (
+                    <div
+                      key={notif.id}
+                      className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 bg-slate-50/50 dark:bg-slate-950/40 hover:border-emerald-300 dark:hover:border-emerald-800 transition"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-black text-sm text-slate-900 dark:text-white">
+                            {notif.customerName || "Customer"}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {notif.projectId}
+                          </span>
+                          {notif.stage && (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-[10px] font-bold text-emerald-800 dark:text-emerald-300">
+                              {notif.stage}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 font-bold text-[10px]">
+                            {notif.channel}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 font-bold text-[10px]">
+                            {notif.status}
+                          </span>
+                          <span className="text-[11px] font-medium text-slate-400">
+                            {new Date(notif.createdAt).toLocaleString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-col md:flex-row md:items-start justify-between gap-3">
+                        <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-xs">
+                          <div className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 mb-1 flex items-center gap-1.5">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                            Mock WhatsApp Message Body
+                          </div>
+                          <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line font-normal leading-relaxed">
+                            {notif.message}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right md:w-44 text-xs space-y-1">
+                          <div className="text-slate-400 font-medium text-[11px]">Recipient</div>
+                          <div className="font-mono text-xs text-slate-600 dark:text-slate-300 font-semibold">
+                            {notif.recipient}
+                          </div>
+                          {notif.readAt && (
+                            <div className="text-[10px] text-emerald-600 font-medium">
+                              Read: {new Date(notif.readAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
+          )}
         </div>
       )}
 
@@ -877,6 +1111,16 @@ export default function AdminDashboardPage() {
                 <p className="text-slate-600 dark:text-slate-300">
                   {selectedLead.scoreBreakdown.explanation}
                 </p>
+                <div className="grid grid-cols-2 gap-2 text-slate-600 dark:text-slate-300 sm:grid-cols-5">
+                  <span>Ownership {selectedLead.scoreBreakdown.ownershipPoints}/25</span>
+                  <span>Bill {selectedLead.scoreBreakdown.billPoints}/25</span>
+                  <span>Roof {selectedLead.scoreBreakdown.roofAreaPoints}/20</span>
+                  <span>Units {selectedLead.scoreBreakdown.consumptionPoints}/20</span>
+                  <span>Serviceability {selectedLead.scoreBreakdown.serviceabilityPoints}/10</span>
+                </div>
+                {selectedLead.scoreBreakdown.reasonCodes?.length ? (
+                  <p className="text-slate-500 dark:text-slate-400">Review flags: {selectedLead.scoreBreakdown.reasonCodes.join(", ")}</p>
+                ) : null}
               </div>
             )}
 

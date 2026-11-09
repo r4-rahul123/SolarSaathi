@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SolarDB } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth-server";
+import { hideLeadScoring } from "@/lib/lead-privacy";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +26,10 @@ export async function POST(request: NextRequest) {
       billImageName: body.billImageName,
     }, false);
 
-    return NextResponse.json({ success: true, lead });
+    const user = await getSessionUser();
+    const sanitizedLead = user && user.role !== "HOMEOWNER" ? lead : hideLeadScoring(lead);
+
+    return NextResponse.json({ success: true, lead: sanitizedLead });
   } catch (error) {
     console.error("Estimate preview failed", error);
     return NextResponse.json({ error: "Could not calculate this estimate. Please check the bill details and try again." }, { status: 503 });

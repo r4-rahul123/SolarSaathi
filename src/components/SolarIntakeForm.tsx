@@ -19,13 +19,17 @@ import { BillExtraction, Lead, OccupancyType, RoofType } from "@/types/solar";
 import { QuoteDisplay } from "./QuoteDisplay";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
+import { clearPendingEstimate, loadPendingEstimate, savePendingEstimate } from "@/lib/pending-estimate-storage";
+import { getBusinessSupportMailto } from "@/config/business";
 
 interface SolarIntakeFormProps {
   onLeadCreated?: (lead: Lead) => void;
 }
 export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const { user, setIsAuthModalOpen } = useAuth();
+  const getDisplayError = (message: string | undefined, fallbackKey: string) =>
+    lang === "en" && message ? message : t(fallbackKey);
 
   // Step State: 1 = Details, 2 = AI Bill Verification, 3 = Quote
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -44,6 +48,8 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
   // Bill & AI Extraction State
   const [billImageBase64, setBillImageBase64] = useState<string>("");
+  const [billMimeType, setBillMimeType] = useState<string>("");
+  const [aiReadFailed, setAiReadFailed] = useState(false);
   const [billFileName, setBillFileName] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [extraction, setExtraction] = useState<BillExtraction | null>(null);
@@ -63,35 +69,61 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("resumeEstimate") !== "1") return;
-    const saved = sessionStorage.getItem("solarsaathi-pending-estimate");
-    if (!saved) return;
-    try {
-      const draft = JSON.parse(saved);
+    let active = true;
+    const restoreDraft = async () => {
+      try {
+        let draft: { form: Record<string, unknown>; previewLead?: unknown } | null = null;
+        try {
+          draft = await loadPendingEstimate();
+        } catch {
+          // Fall back to the session draft for browsers where IndexedDB is unavailable.
+        }
+        if (!draft) {
+          const saved = sessionStorage.getItem("solarsaathi-pending-estimate");
+          if (saved && saved !== "indexeddb") draft = JSON.parse(saved);
+        }
+        if (!draft || !active) return;
+        const form = draft.form as Record<string, unknown>;
+        const readString = (key: string) => typeof form[key] === "string" ? form[key] as string : "";
+        const readNumber = (key: string, fallback: number) => Number(form[key]) || fallback;
+        const restoredImage = readString("billImageBase64");
+        const restoredMime = readString("billMimeType");
+        const restoredExtraction = form.extraction as typeof extraction;
+        const restoredLead = draft.previewLead as Lead | null;
+        const restoredOccupancy: OccupancyType = readString("occupancy") === "Tenant" ? "Tenant" : "Owner";
+        const roofTypes: RoofType[] = ["Concrete Flat", "Tin Shed", "Tiled Roof", "Other"];
+        const storedRoofType = readString("roofType") as RoofType;
+        if (!active) return;
       queueMicrotask(() => {
-        setName(draft.form.name || "");
-        setPhone(draft.form.phone || "");
-        setEmail(draft.form.email || "");
-        setAddress(draft.form.address || "");
-        setPincode(draft.form.pincode || "");
-        setCity(draft.form.city || "Nagpur");
-        setOccupancy(draft.form.occupancy || "Owner");
-        setRoofType(draft.form.roofType || "Concrete Flat");
-        setRoofAreaSqFt(Number(draft.form.roofAreaSqFt) || 650);
+        setName(readString("name"));
+        setPhone(readString("phone"));
+        setEmail(readString("email"));
+        setAddress(readString("address"));
+        setPincode(readString("pincode"));
+        setCity(readString("city") || "Nagpur");
+        setOccupancy(restoredOccupancy);
+        setRoofType(roofTypes.includes(storedRoofType) ? storedRoofType : "Concrete Flat");
+        setRoofAreaSqFt(readNumber("roofAreaSqFt", 650));
         setPrivacyConsent(true);
-        setBillFileName(draft.form.billFileName || "");
-        setExtraction(draft.form.extraction || null);
-        setConsumerNumber(draft.form.consumerNumber || "");
-        setTariff(draft.form.tariff || "");
-        setSanctionedLoad(Number(draft.form.sanctionedLoad) || 0);
-        setMonthlyUnits(Number(draft.form.monthlyUnits) || 0);
-        setMonthlyBill(Number(draft.form.monthlyBill) || 0);
-        setPreviewLead(draft.previewLead || null);
+        setBillFileName(readString("billFileName"));
+        if (restoredImage) setBillImageBase64(restoredImage);
+        if (restoredMime) setBillMimeType(restoredMime);
+        setExtraction(restoredExtraction || null);
+        setConsumerNumber(readString("consumerNumber"));
+        setTariff(readString("tariff"));
+        setSanctionedLoad(readNumber("sanctionedLoad", 0));
+        setMonthlyUnits(readNumber("monthlyUnits", 0));
+        setMonthlyBill(readNumber("monthlyBill", 0));
+        setPreviewLead(restoredLead || null);
         setStep(3);
         window.history.replaceState({}, "", `${window.location.pathname}#estimate`);
       });
-    } catch {
-      sessionStorage.removeItem("solarsaathi-pending-estimate");
-    }
+      } catch (error) {
+        console.error("Could not restore the saved estimate", error);
+      }
+    };
+    void restoreDraft();
+    return () => { active = false; };
   }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,12 +132,12 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
     const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     if (!allowedTypes.includes(file.type)) {
-      setErrorMsg("Choose a JPG, PNG, WebP or PDF bill file.");
+      setErrorMsg(t("invalidBillFile"));
       e.target.value = "";
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setErrorMsg("This file is over 10 MB. Choose a smaller bill photo or PDF.");
+      setErrorMsg(t("billFileTooLarge"));
       e.target.value = "";
       return;
     }
@@ -118,13 +150,15 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
     setMonthlyUnits(0);
     setMonthlyBill(0);
     setBillFileName(file.name);
+    setBillMimeType(file.type);
+    setAiReadFailed(false);
     const reader = new FileReader();
     reader.onload = async () => {
       const base64 = reader.result as string;
       setBillImageBase64(base64);
       triggerAIExtraction(base64, file.type);
     };
-    reader.onerror = () => setErrorMsg("Could not open this file. Try choosing it again.");
+    reader.onerror = () => setErrorMsg(t("couldNotOpenFile"));
     reader.readAsDataURL(file);
     e.target.value = "";
   };
@@ -132,6 +166,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
   const triggerAIExtraction = async (base64Data: string, mimeType: string) => {
     setIsAnalyzing(true);
     setErrorMsg(null);
+    setAiReadFailed(false);
 
     try {
       const res = await fetch("/api/ai/parse-bill", {
@@ -145,18 +180,22 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
       const ext: BillExtraction = data.extraction;
       setExtraction(ext);
+      const hasExtractedValue = Boolean(
+        ext.consumerNumber || ext.tariff || ext.sanctionedLoadKw || ext.monthlyUnits || ext.monthlyAmount,
+      );
+      setAiReadFailed(!hasExtractedValue);
 
       if (ext.consumerNumber) setConsumerNumber(ext.consumerNumber);
       if (ext.tariff) setTariff(ext.tariff);
       if (ext.sanctionedLoadKw) setSanctionedLoad(ext.sanctionedLoadKw);
       if (ext.monthlyUnits) setMonthlyUnits(ext.monthlyUnits);
       if (ext.monthlyAmount) setMonthlyBill(ext.monthlyAmount);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "The bill could not be read.";
-      setErrorMsg(`${msg} You can enter the values manually below.`);
+    } catch {
+      setAiReadFailed(true);
+      setErrorMsg(getDisplayError(undefined, "billReadFailed"));
       setExtraction({
         confidence: { overall: "Unclear" },
-        extractionNotes: "No values were read. Enter them manually and compare them with the uploaded bill.",
+        extractionNotes: t("billValuesNotRead"),
       });
     } finally {
       setIsAnalyzing(false);
@@ -178,11 +217,11 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
   const validateEstimate = (requireBill = true) => {
     if (!name.trim() || !phone.trim() || monthlyUnits <= 0 || monthlyBill <= 0 || sanctionedLoad <= 0 || !tariff.trim()) {
-      setErrorMsg("Add your contact details and check the bill fields. Monthly units, bill amount, load and tariff are required.");
+      setErrorMsg(t("contactFieldsRequired"));
       return false;
     }
     if (requireBill && !billImageBase64 && !extraction) {
-      setErrorMsg("Upload a bill photo or PDF to continue.");
+      setErrorMsg(t("billUploadRequired"));
       return false;
     }
     return true;
@@ -205,8 +244,8 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
       setCreatedLead(null);
       setStep(3);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Submission error";
-      setErrorMsg(msg);
+      const msg = err instanceof Error ? err.message : undefined;
+      setErrorMsg(getDisplayError(msg, "estimateFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -214,15 +253,31 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
   const handleSaveEstimate = async () => {
     if (!user) {
-      sessionStorage.setItem("solarsaathi-pending-estimate", JSON.stringify({
-        form: { name, phone, email, address, pincode, city, occupancy, roofType, roofAreaSqFt, billFileName, extraction, consumerNumber, tariff, sanctionedLoad, monthlyUnits, monthlyBill },
-        previewLead,
-      }));
+      const formPayload = {
+        name, phone, email, address, pincode, city, occupancy, roofType, roofAreaSqFt,
+        billFileName, billImageBase64, billMimeType, extraction, consumerNumber, tariff,
+        sanctionedLoad, monthlyUnits, monthlyBill
+      };
+      try {
+        await savePendingEstimate({ form: formPayload, previewLead });
+        sessionStorage.setItem("solarsaathi-pending-estimate", "indexeddb");
+      } catch {
+        try {
+          const rest: Record<string, unknown> = { ...formPayload };
+          delete rest.billImageBase64;
+          delete rest.billMimeType;
+          sessionStorage.setItem("solarsaathi-pending-estimate", JSON.stringify({ form: rest, previewLead }));
+          setErrorMsg(t("billDraftStorageFallback"));
+        } catch {
+          setErrorMsg(t("billDraftStorageFailed"));
+          return;
+        }
+      }
       setIsAuthModalOpen(true);
       return;
     }
     if (user.role !== "HOMEOWNER") {
-      setErrorMsg("Please use a homeowner account to save this estimate.");
+      setErrorMsg(t("homeownerAccountRequired"));
       return;
     }
     if (!validateEstimate(false)) return;
@@ -235,9 +290,10 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
       setCreatedLead(data.lead);
       setPreviewLead(null);
       sessionStorage.removeItem("solarsaathi-pending-estimate");
+      void clearPendingEstimate().catch(() => {});
       onLeadCreated?.(data.lead);
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Could not save estimate");
+      setErrorMsg(getDisplayError(err instanceof Error ? err.message : undefined, "saveEstimateFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -250,7 +306,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
     return (
       <div className="space-y-6">
-        {createdLead && <>
+        {createdLead && <div className="print:hidden space-y-6">
         {/* Status Alert Banner */}
         {isSiteVisit ? (
           <div className="bg-emerald-50 dark:bg-emerald-950/40 border-2 border-[#198754]/40 rounded-3xl p-6 flex flex-col sm:flex-row items-start gap-4 backdrop-blur-sm shadow-md">
@@ -298,10 +354,8 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
           </div>
         )}
 
-        </>}
-
         {/* 100-POINT TRANSPARENT SCORE BREAKDOWN CARD */}
-        {breakdown && (
+        {breakdown && user?.role !== "HOMEOWNER" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-7 shadow-sm space-y-5">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
               <div>
@@ -399,6 +453,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             </div>
           </div>
         )}
+        </div>}
 
         <QuoteDisplay lead={displayLead} isPreview={!createdLead} isSavingEstimate={isSubmitting} onSaveEstimate={handleSaveEstimate} />
       </div>
@@ -406,7 +461,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md overflow-hidden transition-colors">
+    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md overflow-hidden transition-colors print:hidden">
       {/* Top Header & Step Progress Bar */}
       <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-6 py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -415,10 +470,10 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
           </div>
           <div>
             <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                  {step === 1 ? "Step 1: Property & contact" : "Step 2: Review your electricity bill"}
+              {step === 1 ? t("stepPropertyContact") : t("stepReviewBill")}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              {step === 1 ? "Homeowner enquiry • Nagpur & Vidarbha" : "Check the values read from your bill"}
+              {step === 1 ? `${t("homeownerEnquiry")} • ${t("region")}` : t("reviewBillValues")}
             </p>
           </div>
         </div>
@@ -430,6 +485,9 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
           <div className="mb-6 p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-center gap-2.5 font-medium">
             <AlertCircle className="w-5 h-5 shrink-0" />
             <span>{errorMsg}</span>
+            <a className="shrink-0 font-bold underline underline-offset-2" href={getBusinessSupportMailto("General enquiry")}>
+              {t("contactSupport")}
+            </a>
           </div>
         )}
 
@@ -439,15 +497,15 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             onSubmit={(e) => {
               e.preventDefault();
               if (!name || !phone) {
-                setErrorMsg("Please enter your name and phone number.");
+                setErrorMsg(t("contactFieldsRequired"));
                 return;
               }
               if (!/^\d{6}$/.test(pincode)) {
-                setErrorMsg("Enter a valid six-digit PIN code.");
+                setErrorMsg(t("invalidPinCode"));
                 return;
               }
               if (!privacyConsent) {
-                setErrorMsg("Please agree to the use of your details so we can prepare the estimate and contact you.");
+                setErrorMsg(t("consentRequired"));
                 return;
               }
               setErrorMsg(null);
@@ -458,22 +516,22 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             <div>
               <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <User className="w-5 h-5 text-[#198754]" />
-                Contact & Installation Address
+                {t("contactInstallationAddress")}
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                Your PIN code helps the team route your enquiry to the right service area.
+                {t("pinServiceAreaHint")}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Full Name *
+                  {t("fullName")}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Your name"
+                  placeholder={t("namePlaceholder")}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
@@ -482,12 +540,12 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  WhatsApp / Phone Number *
+                  {t("mobileFollowUp")}
                 </label>
                 <input
                   type="tel"
                   required
-                    placeholder="e.g. +91 98765 43210"
+                  placeholder={t("mobilePlaceholder")}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
@@ -496,7 +554,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Email Address (For Quote PDF)
+                  {t("emailForQuote")}
                 </label>
                 <input
                   type="email"
@@ -509,7 +567,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  District / Division
+                  {t("districtDivision")}
                 </label>
                 <select
                   value={city}
@@ -526,19 +584,19 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
               <div className="sm:col-span-2">
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Rooftop Address & PIN code
+                  {t("rooftopAddressPin")}
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Plot / Street / Area (e.g. Somalwada, Wardha Road)"
+                    placeholder={t("addressPlaceholder")}
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   />
                   <input
                     type="text"
-                    placeholder="PIN code"
+                    placeholder={t("pinPlaceholder")}
                     value={pincode}
                     onChange={(e) => setPincode(e.target.value)}
                     maxLength={6}
@@ -553,16 +611,16 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
             <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
               <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 mb-1">
                 <Home className="w-5 h-5 text-[#198754]" />
-                Rooftop Ownership & Structure
+                {t("rooftopOwnershipStructure")}
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4 font-medium">
-                Ownership affects the next step. Subsidy eligibility is checked separately.
+                {t("ownershipEligibilityHint")}
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Are you the House Owner or Tenant? *
+                    {t("ownerOrTenant")}
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -592,27 +650,27 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Rooftop Construction
+                    {t("rooftopConstruction")}
                   </label>
                   <select
                     value={roofType}
                     onChange={(e) => setRoofType(e.target.value as RoofType)}
                     className="w-full px-4 py-3 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#198754]/20 focus:border-[#198754] transition-all bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   >
-                    <option value="Concrete Flat">Concrete Flat Slab (Most common)</option>
-                    <option value="Tin Shed">Tin / Metal Shed</option>
-                    <option value="Tiled Roof">Tiled / Sloped Roof</option>
-                    <option value="Other">Other</option>
+                    <option value="Concrete Flat">{t("concreteRoof")}</option>
+                    <option value="Tin Shed">{t("metalShed")}</option>
+                    <option value="Tiled Roof">{t("tiledRoof")}</option>
+                    <option value="Other">{t("otherRoof")}</option>
                   </select>
                 </div>
 
                 <div className="sm:col-span-2 pt-2">
                   <div className="flex justify-between items-center mb-2">
                     <label className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
-                      Approximate Rooftop Shadow-Free Area (sq. ft.)
+                      {t("shadowFreeArea")}
                     </label>
                     <span className="font-mono text-xs sm:text-sm font-black text-[#198754] bg-[#E7F3EC] dark:bg-[#123D2B]/50 px-2.5 py-1 rounded-lg border border-[#198754]/30">
-                      {roofAreaSqFt} sq. ft. (~{(roofAreaSqFt / 100).toFixed(1)} kW guide)
+                      {roofAreaSqFt} sq. ft. (~{(roofAreaSqFt / 100).toFixed(1)} {t("roofCapacityGuide")})
                     </span>
                   </div>
                   <input
@@ -635,7 +693,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 onChange={(e) => setPrivacyConsent(e.target.checked)}
                 className="mt-0.5 h-4 w-4 accent-[#198754]"
               />
-              <span>I agree that my contact details and electricity-bill information can be used to prepare this estimate and contact me about my enquiry.</span>
+              <span>{t("privacyConsent")}</span>
             </label>
 
             <div className="flex justify-end pt-4">
@@ -643,7 +701,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 type="submit"
                 className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#123D2B] hover:bg-[#198754] text-white rounded-2xl font-black text-sm shadow-lg shadow-[#123D2B]/20 transition-all hover:scale-[1.02] cursor-pointer"
               >
-                <span>Continue to Bill Verification</span>
+                <span>{t("continueBillVerification")}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -657,10 +715,10 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
               <div>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <Zap className="w-5 h-5 text-[#198754]" />
-                  MSEDCL Electricity Bill Analysis
+                  {t("billAnalysisTitle")}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                  We will try to read the bill. Check or enter the values before continuing.
+                  {t("billAnalysisHint")}
                 </p>
               </div>
 
@@ -669,7 +727,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 onClick={() => setStep(1)}
                 className="text-xs font-bold text-[#198754] dark:text-emerald-400 hover:underline cursor-pointer"
               >
-                ← Edit Step 1
+                {t("editStepOne")}
               </button>
             </div>
 
@@ -696,17 +754,27 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 <div>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white block">
                     {isAnalyzing
-                      ? "Reading bill…"
+                      ? t("readingBill")
                       : billFileName
-                      ? `Selected: ${billFileName}`
+                      ? `${t("selectedFile")} ${billFileName}`
                       : t("uploadBill")}
                   </span>
                   <p className="text-xs text-slate-400 mt-1 font-medium">
-                    JPG, PNG, WebP or PDF • Max 10 MB
+                    {t("uploadFileLimit")}
                   </p>
                 </div>
               </label>
             </div>
+
+            {aiReadFailed && billImageBase64 && !isAnalyzing && (
+              <button
+                type="button"
+                onClick={() => triggerAIExtraction(billImageBase64, billMimeType)}
+                className="rounded-xl border border-[#198754]/30 bg-[#E7F3EC]/60 px-4 py-2 text-sm font-bold text-[#123D2B] hover:bg-[#E7F3EC] dark:bg-[#123D2B]/40 dark:text-emerald-300"
+              >
+                {t("retryBillReading")}
+              </button>
+            )}
 
             {/* THE SIDE-BY-SIDE VERIFICATION WORKSTATION */}
             <div className="bg-slate-50 dark:bg-slate-950 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4">
@@ -714,30 +782,39 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-[#198754]" />
                   <span className="text-xs uppercase tracking-wider font-black text-slate-800 dark:text-slate-200">
-                    Side-by-Side Document & Field Verification
+                    {t("documentFieldVerification")}
                   </span>
                 </div>
 
-                <span className="text-xs text-slate-500 dark:text-slate-400">Check the bill fields before continuing.</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{t("checkBillFields")}</span>
               </div>
 
               {extraction?.extractionNotes && (
                 <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-                  {extraction.extractionNotes}
+                  {lang === "en"
+                    ? extraction.extractionNotes
+                    : aiReadFailed
+                      ? t("billValuesNotRead")
+                      : t("billExtractionReviewNote")}
+                  {aiReadFailed && (
+                    <span className="mt-2 block">
+                      {t("billReadingHelp")} <a className="font-bold underline underline-offset-2" href={getBusinessSupportMailto("Bill reading assistance")}>{t("emailSolarSaathiSupport")}</a>.
+                    </span>
+                  )}
                 </p>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex min-h-72 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                   {billImageBase64 && billImageBase64.startsWith("data:image/") ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={billImageBase64} alt="Uploaded electricity bill" className="max-h-[520px] w-full object-contain" />
+                    <img src={billImageBase64} alt={t("uploadedBillImage")} className="max-h-[520px] w-full object-contain" />
                   ) : billImageBase64 && billImageBase64.startsWith("data:application/pdf") ? (
-                    <iframe title="Uploaded electricity bill PDF" src={billImageBase64} className="h-[520px] w-full" />
+                    <iframe title={t("uploadedBillPdf")} src={billImageBase64} className="h-[520px] w-full" />
                   ) : (
                     <div className="px-6 text-center text-sm text-slate-500 dark:text-slate-400">
                       <FileText className="mx-auto mb-3 h-8 w-8 text-slate-400" />
-                      <p className="font-medium">{billFileName || "No bill uploaded"}</p>
-                      <p className="mt-1 text-xs">{billImageBase64 ? "Preview is unavailable for this file." : "Upload a bill photo or PDF to preview it here."}</p>
+                      <p className="font-medium">{billFileName || t("noBillUploaded")}</p>
+                      <p className="mt-1 text-xs">{billImageBase64 ? t("previewUnavailable") : t("uploadBillToPreview")}</p>
                     </div>
                   )}
                 </div>
@@ -746,16 +823,16 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                   <div className="flex items-center justify-between">
                     <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                       <Edit3 className="w-4 h-4 text-[#198754]" />
-                      Verify / Adjust Extracted Values
+                      {t("verifyAdjustValues")}
                     </span>
-                    <span className="text-xs text-slate-400 font-medium">Editable fields</span>
+                    <span className="text-xs text-slate-400 font-medium">{t("editableFields")}</span>
                   </div>
 
                   <div className="space-y-3">
                     <div>
                       <div className="flex justify-between items-center mb-1">
                         <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                          Consumer Number (12 digits)
+                            {t("consumerNumber")}
                         </label>
                       </div>
                       <input
@@ -770,7 +847,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                       <div>
                         <div className="flex justify-between items-center mb-1">
                           <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                            Monthly Units (kWh) *
+                            {t("monthlyUnits")}
                           </label>
                         </div>
                         <input
@@ -785,7 +862,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
 
                       <div>
                         <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          Monthly Bill (₹) *
+                          {t("monthlyBill")}
                         </label>
                         <input
                           type="number"
@@ -802,14 +879,14 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                       <div>
                         <div className="flex justify-between items-center mb-1">
                           <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                            Sanctioned Load (kW)
+                            {t("sanctionedLoad")}
                           </label>
                         </div>
                         <input
                           type="number"
                           required
                           min="0.1"
-                          step="0.5"
+                          step="0.1"
                           value={sanctionedLoad || ""}
                           onChange={(e) => setSanctionedLoad(Number(e.target.value))}
                           className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl focus:border-[#198754] focus:outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
@@ -819,7 +896,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                       <div>
                         <div className="flex justify-between items-center mb-1">
                           <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                            Tariff Category
+                            {t("tariffCategory")}
                           </label>
                         </div>
                         <input
@@ -841,7 +918,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 onClick={() => setStep(1)}
                 className="px-5 py-2.5 text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
               >
-                ← Back
+                {t("back")}
               </button>
 
               <button
@@ -852,11 +929,11 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                 {isSubmitting ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Calculating estimate…</span>
+                    <span>{t("calculatingEstimate")}</span>
                   </>
                 ) : (
                   <>
-                    <span>Prepare estimate</span>
+                    <span>{t("prepareEstimate")}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

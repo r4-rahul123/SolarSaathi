@@ -5,7 +5,6 @@ import {
   calculateSolarQuote,
   recommendSystemSize,
   scoreLead,
-  DEFAULT_SUBSIDY_RULE,
 } from "../src/lib/solar-calculator.js";
 
 describe("Solar Financial & Subsidy Calculation Engine", () => {

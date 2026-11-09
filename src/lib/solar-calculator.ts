@@ -63,7 +63,7 @@ function buildOption(
   const annualGenerationUnits = kw * rule.generationPerKwPerYear;
   const annualSavings = annualGenerationUnits * rule.gridTariffPerUnit;
   const monthlySavings = Math.round(annualSavings / 12);
-  const paybackYears = Number((netCost / annualSavings).toFixed(2));
+  const paybackYears = annualSavings > 0 ? Number((netCost / annualSavings).toFixed(2)) : null;
   const lifetimeSavings25Yrs = annualSavings * 25 - netCost;
 
   return {
@@ -105,6 +105,8 @@ export function calculateSolarQuote(
       ruleName: rule.name,
       effectiveDate: rule.effectiveFrom,
       maxCap: rule.maxSubsidyCap,
+      tier1RatePerKw: rule.tier1RatePerKw,
+      tier2RatePerKw: rule.tier2RatePerKw,
       generationFactor: rule.generationPerKwPerYear,
       tariffAssumption: rule.gridTariffPerUnit,
     },
@@ -172,6 +174,13 @@ export function calculateLeadScore(
       : nextAction === "SITE_VISIT"
         ? `Score ${totalScore}/100 (High). Suggested next step: site survey review.`
         : `Score ${totalScore}/100 (${tier}). Suggested next step: a short sales review before arranging a survey.`;
+  const reasonCodes = [
+    ...(occupancy === "Tenant" ? ["TENANT_PERMISSION_CHECK"] : []),
+    ...(monthlyBill < 800 ? ["LOW_MONTHLY_BILL"] : []),
+    ...(avgUnitsPerMonth < 100 ? ["LOW_MONTHLY_CONSUMPTION"] : []),
+    ...(roofAreaSqFt < 300 ? ["LIMITED_ROOF_AREA"] : []),
+    ...(tier === "High" ? ["HIGH_FIT_SCORE"] : tier === "Medium" ? ["REVIEW_SCORE"] : ["LOW_FIT_SCORE"]),
+  ];
 
   return {
     breakdown: {
@@ -183,6 +192,7 @@ export function calculateLeadScore(
       totalScore,
       tier,
       explanation,
+      reasonCodes,
     },
     nextAction,
   };

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import argon2 from "argon2";
 import { z } from "zod";
-import { createUserSession } from "@/lib/auth-server";
+import { createSessionCredential, insertSessionRecord, setSessionCookie } from "@/lib/auth-server";
 import { getPostgresPool } from "@/lib/postgres";
+import { withPostgresTransaction } from "@/lib/postgres-transaction";
 
 const SignupSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -19,11 +20,15 @@ export async function POST(request: NextRequest) {
   const { name, email, password } = parsed.data;
   try {
     const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
-    const { rows } = await getPostgresPool().query<{ id: string }>(
-      "INSERT INTO app_users (name, email, password_hash, role) VALUES ($1, $2, $3, 'HOMEOWNER') RETURNING id",
-      [name, email, passwordHash],
-    );
-    await createUserSession(rows[0].id);
+    const session = createSessionCredential();
+    await withPostgresTransaction(getPostgresPool(), async (client) => {
+      const { rows } = await client.query<{ id: string }>(
+        "INSERT INTO app_users (name, email, password_hash, role) VALUES ($1, $2, $3, 'HOMEOWNER') RETURNING id",
+        [name, email, passwordHash],
+      );
+      await insertSessionRecord(client, rows[0].id, session);
+    });
+    await setSessionCookie(session);
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
     const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;

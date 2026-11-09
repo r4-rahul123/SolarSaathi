@@ -1,6 +1,9 @@
-import { Lead, SubsidyRule, PricingRule, ProjectStage } from "@/types/solar";
+import { Lead, SubsidyRule, PricingRule, ProjectStage, MockNotification } from "@/types/solar";
 import { getPostgresPool, hasPostgresConfig } from "@/lib/postgres";
+import { withPostgresTransaction } from "@/lib/postgres-transaction";
+import { createMockNotificationRecord, generateMockWhatsAppMessage } from "@/lib/mock-notifications";
 import { randomUUID } from "node:crypto";
+import { daysSinceStatusChange, isProjectStuck } from "@/lib/project-timing";
 import {
   calculateLeadScore,
   calculateSolarQuote,
@@ -21,17 +24,17 @@ const INITIAL_PRICING: PricingRule[] = DEFAULT_PRICING_RULES;
 const INITIAL_LEADS: Lead[] = [
   {
     id: "LD-30881",
-    name: "Prashant Wankhede",
-    phone: "+91 98231 44521",
-    email: "prashant.w@gmail.com",
-    address: "Plot 42, Wardha Road, Somalwada",
+    name: "Aarav Kulkarni (Sample Customer)",
+    phone: "",
+    email: "",
+    address: "Sample Residence, Wardha Road, Somalwada",
     pincode: "440015",
     city: "Nagpur",
     occupancy: "Owner",
     roofType: "Concrete Flat",
     roofAreaSqFt: 650,
-    monthlyBill: 3200,
-    avgUnitsPerMonth: 340,
+    monthlyBill: 3500,
+    avgUnitsPerMonth: 375,
     recommendedKw: 3,
     scoreBreakdown: {
       ownershipPoints: 25,
@@ -41,16 +44,16 @@ const INITIAL_LEADS: Lead[] = [
       serviceabilityPoints: 10,
       totalScore: 100,
       tier: "High",
-      explanation: "High Priority Score (100/100). Verified owner with high consumption (340 kWh/mo). Immediate site survey approved.",
+      explanation: "Illustrative high-priority score based on a sample owner profile with 375 kWh monthly consumption.",
     },
     status: "SITE_SURVEY",
     nextAction: "SITE_VISIT",
     billExtraction: {
-      consumerNumber: "410019283741",
+      consumerNumber: "SAMPLE-410019283741",
       tariff: "LT-I (Residential Single Phase)",
       sanctionedLoadKw: 4.0,
-      monthlyUnits: 340,
-      monthlyAmount: 3200,
+      monthlyUnits: 375,
+      monthlyAmount: 3500,
       billingUnit: "Nagpur Urban BU-41",
       confidence: {
         consumerNumber: 0.98,
@@ -59,7 +62,7 @@ const INITIAL_LEADS: Lead[] = [
         monthlyUnits: 0.88,
         overall: "High",
       },
-      extractionNotes: "MSEDCL bill verified. Matched consumer address and sanctioned load.",
+      extractionNotes: "Illustrative sample bill data; not a real customer record.",
       extractedAt: "2026-11-01T10:16:30Z",
     },
     quote: calculateSolarQuote("LD-30881", 3),
@@ -67,7 +70,7 @@ const INITIAL_LEADS: Lead[] = [
       {
         stage: "LEAD_APPROVED",
         title: "1. Lead & Bill Approved",
-        description: "MSEDCL Bill #410019283741 verified via Gemini Vision OCR.",
+        description: "Illustrative sample bill reviewed for the demo workflow.",
         completedAt: "2026-11-01T10:15:00Z",
       },
       {
@@ -111,11 +114,15 @@ const INITIAL_LEADS: Lead[] = [
     notifications: [
       {
         id: "nt-1",
-        channel: "WhatsApp",
-        recipient: "+91 98231 44521",
-        message: "Namaskar Prashant ji, your 3 kW SolarSaathi quote (Ref: LD-30881) with ₹78,000 PM subsidy is ready. Track here: solarsaathi.app/track/LD-30881",
+        projectId: "LD-30881",
+        customerName: "Aarav Kulkarni (Sample Customer)",
+        channel: "WhatsApp Mock",
+        recipient: "9823012345",
+        message: generateMockWhatsAppMessage("Aarav Kulkarni", "LD-30881", "LEAD_APPROVED"),
+        createdAt: "2026-11-01T10:18:00Z",
         sentAt: "2026-11-01T10:18:00Z",
-        status: "PREVIEW",
+        stage: "LEAD_APPROVED",
+        status: "Sent Mock",
       },
     ],
     assignedStaff: "Sunil Deshpande",
@@ -126,10 +133,10 @@ const INITIAL_LEADS: Lead[] = [
   },
   {
     id: "LD-30902",
-    name: "Rohit Meshram",
-    phone: "+91 97654 32189",
-    email: "rohit.meshram@yahoo.com",
-    address: "Flat 301, Manish Nagar",
+    name: "Riya Deshmukh (Sample Customer)",
+    phone: "",
+    email: "",
+    address: "Sample Apartment 301, Manish Nagar",
     pincode: "440025",
     city: "Nagpur",
     occupancy: "Tenant",
@@ -145,13 +152,13 @@ const INITIAL_LEADS: Lead[] = [
       consumptionPoints: 14,
       serviceabilityPoints: 10,
       totalScore: 63,
-      tier: "Low",
+      tier: "Medium",
       explanation: "Tenant lead. Rooftop property rights belong to landlord. Physical survey replaced with a 5-minute phone call to avoid wasting ₹2,500 survey cost.",
     },
     status: "LEAD_APPROVED",
     nextAction: "SHORT_CALL",
     billExtraction: {
-      consumerNumber: "410087654120",
+      consumerNumber: "SAMPLE-410087654120",
       tariff: "LT-I (Residential)",
       sanctionedLoadKw: 2.0,
       monthlyUnits: 210,
@@ -164,7 +171,7 @@ const INITIAL_LEADS: Lead[] = [
         monthlyUnits: 0.88,
         overall: "High",
       },
-      extractionNotes: "MSEDCL tenant bill parsed.",
+      extractionNotes: "Illustrative tenant sample bill data; not a real customer record.",
       extractedAt: "2026-11-02T11:00:00Z",
     },
     quote: calculateSolarQuote("LD-30902", 2),
@@ -172,7 +179,7 @@ const INITIAL_LEADS: Lead[] = [
       {
         stage: "LEAD_APPROVED",
         title: "1. Lead & Bill Approved",
-        description: "MSEDCL Bill #410087654120 verified.",
+        description: "Illustrative sample tenant bill reviewed.",
         completedAt: "2026-11-02T11:00:00Z",
         isCurrent: true,
       },
@@ -185,11 +192,15 @@ const INITIAL_LEADS: Lead[] = [
     notifications: [
       {
         id: "nt-2",
-        channel: "SMS",
-        recipient: "+91 97654 32189",
-        message: "Hi Rohit, thanks for your SolarSaathi interest! Since you are renting, our advisor will call to guide you on landlord NOC. Ref: LD-30902",
+        projectId: "LD-30902",
+        customerName: "Riya Deshmukh (Sample Customer)",
+        channel: "WhatsApp Mock",
+        recipient: "9823054321",
+        message: generateMockWhatsAppMessage("Riya Deshmukh", "LD-30902", "LEAD_APPROVED"),
+        createdAt: "2026-11-02T11:05:00Z",
         sentAt: "2026-11-02T11:05:00Z",
-        status: "PREVIEW",
+        stage: "LEAD_APPROVED",
+        status: "Sent Mock",
       },
     ],
     assignedStaff: "Pooja Sharma",
@@ -200,10 +211,10 @@ const INITIAL_LEADS: Lead[] = [
   },
   {
     id: "LD-30915",
-    name: "Ayesha Siddiqui",
-    phone: "+91 94228 11902",
-    email: "ayesha.s@outlook.com",
-    address: "House 12, Byramji Town",
+    name: "Meera Siddiqui (Sample Customer)",
+    phone: "",
+    email: "",
+    address: "Sample House 12, Byramji Town",
     pincode: "440013",
     city: "Nagpur",
     occupancy: "Owner",
@@ -219,13 +230,13 @@ const INITIAL_LEADS: Lead[] = [
       consumptionPoints: 4,
       serviceabilityPoints: 10,
       totalScore: 58,
-      tier: "Low",
+      tier: "Medium",
       explanation: "Low consumption (85 units/mo, bill ₹650). Solar payback exceeds 6 years. Routed to telephone advisory instead of immediate ₹2,500 site visit.",
     },
     status: "LEAD_APPROVED",
     nextAction: "SHORT_CALL",
     billExtraction: {
-      consumerNumber: "410055129033",
+      consumerNumber: "SAMPLE-410055129033",
       tariff: "LT-I (Residential)",
       sanctionedLoadKw: 1.0,
       monthlyUnits: 85,
@@ -238,7 +249,7 @@ const INITIAL_LEADS: Lead[] = [
         monthlyUnits: 0.85,
         overall: "High",
       },
-      extractionNotes: "Low consumption detected.",
+      extractionNotes: "Illustrative low-consumption sample bill data; not a real customer record.",
       extractedAt: "2026-11-03T09:30:00Z",
     },
     quote: calculateSolarQuote("LD-30915", 1),
@@ -254,11 +265,15 @@ const INITIAL_LEADS: Lead[] = [
     notifications: [
       {
         id: "nt-3",
-        channel: "WhatsApp",
-        recipient: "+91 94228 11902",
-        message: "Hello Ayesha ji, your 1 kW Solar estimate is ₹45,000 with ₹30,000 PM subsidy. Our team will call you shortly to discuss. Ref: LD-30915",
+        projectId: "LD-30915",
+        customerName: "Meera Siddiqui (Sample Customer)",
+        channel: "WhatsApp Mock",
+        recipient: "9823098765",
+        message: generateMockWhatsAppMessage("Meera Siddiqui", "LD-30915", "LEAD_APPROVED"),
+        createdAt: "2026-11-03T09:32:00Z",
         sentAt: "2026-11-03T09:32:00Z",
-        status: "PREVIEW",
+        stage: "LEAD_APPROVED",
+        status: "Sent Mock",
       },
     ],
     assignedStaff: "Amit Verma",
@@ -269,10 +284,10 @@ const INITIAL_LEADS: Lead[] = [
   },
   {
     id: "PR-1025",
-    name: "Dr. Rajesh Deshmukh",
-    phone: "+91 98222 77110",
-    email: "rajesh.deshmukh@gmail.com",
-    address: "Bungalow 7, Ramdaspeth",
+    name: "Dr. Rajesh Deshmukh (Sample Customer)",
+    phone: "",
+    email: "",
+    address: "Sample Bungalow 7, Ramdaspeth",
     pincode: "440010",
     city: "Nagpur",
     occupancy: "Owner",
@@ -342,10 +357,10 @@ const INITIAL_LEADS: Lead[] = [
   },
   {
     id: "PR-1026",
-    name: "Sunita Patil",
-    phone: "+91 93710 44882",
-    email: "sunita.patil@rediffmail.com",
-    address: "Plot 18, Trimurtee Nagar",
+    name: "Sunita Patil (Sample Customer)",
+    phone: "",
+    email: "",
+    address: "Sample Plot 18, Trimurtee Nagar",
     pincode: "440022",
     city: "Nagpur",
     occupancy: "Owner",
@@ -422,14 +437,12 @@ const INITIAL_LEADS: Lead[] = [
 ];
 
 function withCurrentLeadAge(lead: Lead): Lead {
-  const updatedAt = Date.parse(lead.updatedAt);
-  const lastUpdatedDaysAgo = Number.isFinite(updatedAt)
-    ? Math.max(0, Math.floor((Date.now() - updatedAt) / 86_400_000))
-    : lead.lastUpdatedDaysAgo || 0;
+  const statusChangedAt = lead.lastStatusChangedAt || lead.updatedAt;
+  const lastUpdatedDaysAgo = daysSinceStatusChange(statusChangedAt) || lead.lastUpdatedDaysAgo || 0;
   return {
     ...lead,
     lastUpdatedDaysAgo,
-    isStuck: lead.status !== "SUBSIDY_CREDITED" && lastUpdatedDaysAgo > 7,
+    isStuck: isProjectStuck(lead.status, statusChangedAt),
   };
 }
 
@@ -462,6 +475,23 @@ async function ensureDefaultRules() {
     seedPromise = (async () => {
       try {
         const pool = getPostgresPool();
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS solar_notifications (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            project_id TEXT NOT NULL REFERENCES solar_leads(id) ON DELETE CASCADE,
+            customer_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+            channel TEXT NOT NULL DEFAULT 'WhatsApp Mock',
+            recipient TEXT NOT NULL,
+            message TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Sent Mock',
+            stage TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            read_at TIMESTAMPTZ
+          );
+          CREATE INDEX IF NOT EXISTS solar_notifications_project_id_idx ON solar_notifications(project_id);
+          CREATE INDEX IF NOT EXISTS solar_notifications_customer_id_idx ON solar_notifications(customer_id);
+          CREATE INDEX IF NOT EXISTS solar_notifications_created_at_idx ON solar_notifications(created_at DESC);
+        `);
         for (const rule of INITIAL_RULES) {
           await pool.query(
             "INSERT INTO solar_rules (id, kind, data) VALUES ($1, 'subsidy', $2::jsonb) ON CONFLICT (id) DO NOTHING",
@@ -479,6 +509,24 @@ async function ensureDefaultRules() {
             "INSERT INTO solar_leads (id, data) VALUES ($1, $2::jsonb) ON CONFLICT (id) DO NOTHING",
             [lead.id, JSON.stringify(lead)],
           );
+          for (const notif of lead.notifications || []) {
+            await pool.query(
+              `INSERT INTO solar_notifications (id, project_id, customer_id, channel, recipient, message, status, stage, created_at)
+               VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)
+               ON CONFLICT (id) DO NOTHING`,
+              [
+                notif.id.length === 36 ? notif.id : randomUUID(),
+                lead.id,
+                lead.ownerUserId || null,
+                notif.channel,
+                notif.recipient,
+                notif.message,
+                notif.status,
+                notif.stage,
+                notif.createdAt,
+              ]
+            ).catch(() => undefined);
+          }
         }
       } catch (err) {
         console.warn("Postgres seeding skipped or failed:", err instanceof Error ? err.message : err);
@@ -605,6 +653,7 @@ export class SolarDB {
       isStuck: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      lastStatusChangedAt: new Date().toISOString(),
     };
 
     if (!saveToDatabase) return newLead;
@@ -681,9 +730,15 @@ export class SolarDB {
       "SUBSIDY_CREDITED",
     ];
 
+    const isStageValid = updates.status ? ORDERED_STAGES.includes(updates.status) : false;
+    const isStatusChanged = isStageValid && updates.status !== existing.status;
+
     let newTimeline = existing.timeline || [];
-    if (updates.status && updates.status !== existing.status) {
-      const targetIdx = ORDERED_STAGES.indexOf(updates.status);
+    let newNotification: MockNotification | null = null;
+
+    if (isStatusChanged && updates.status) {
+      const targetStage = updates.status;
+      const targetIdx = ORDERED_STAGES.indexOf(targetStage);
 
       newTimeline = ORDERED_STAGES.map((stg, i) => {
         const meta = STAGE_METADATA[stg];
@@ -698,17 +753,64 @@ export class SolarDB {
           isCurrent: isCurr,
         };
       });
+
+      // Avoid creating duplicate notification if one already exists for this exact stage
+      const existingNotifs = existing.notifications || [];
+      const alreadyHasStageNotif = existingNotifs.some((n) => n.stage === targetStage);
+
+      if (!alreadyHasStageNotif) {
+        newNotification = createMockNotificationRecord(existing, targetStage, "WhatsApp Mock");
+      }
     }
+
+    const currentNotifications = newNotification
+      ? [newNotification, ...(existing.notifications || [])]
+      : updates.notifications || existing.notifications || [];
 
     const updated: Lead = {
       ...existing,
       ...updates,
       timeline: updates.timeline || newTimeline,
-      notifications: updates.notifications || existing.notifications || [],
+      notifications: currentNotifications,
       lastUpdatedDaysAgo: 0,
       isStuck: false,
       updatedAt: new Date().toISOString(),
+      lastStatusChangedAt: isStatusChanged
+        ? new Date().toISOString()
+        : existing.lastStatusChangedAt || existing.updatedAt,
     };
+
+    // Update Postgres if available using ATOMIC TRANSACTION
+    if (hasPostgresConfig()) {
+      try {
+        await withPostgresTransaction(getPostgresPool(), async (client) => {
+          await client.query(
+            "UPDATE solar_leads SET data = $2::jsonb, updated_at = NOW() WHERE LOWER(id) = LOWER($1)",
+            [id, JSON.stringify(updated)],
+          );
+          if (newNotification) {
+            await client.query(
+              `INSERT INTO solar_notifications (id, project_id, customer_id, channel, recipient, message, status, stage, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+              [
+                newNotification.id,
+                newNotification.projectId,
+                newNotification.customerId || null,
+                newNotification.channel,
+                newNotification.recipient,
+                newNotification.message,
+                newNotification.status,
+                newNotification.stage,
+                newNotification.createdAt,
+              ],
+            );
+          }
+        });
+      } catch (err) {
+        console.warn("Postgres status update transaction failed:", err instanceof Error ? err.message : err);
+        throw err;
+      }
+    }
 
     // Update in-memory
     const memLeads = getMemoryLeads();
@@ -718,19 +820,97 @@ export class SolarDB {
       globalThis.__solarLeadsStore = memLeads;
     }
 
-    // Update Postgres if available
+    return updated;
+  }
+
+  static async getNotifications(filters?: {
+    projectId?: string;
+    customerId?: string;
+    channel?: string;
+    status?: string;
+  }): Promise<MockNotification[]> {
     if (hasPostgresConfig()) {
       try {
-        await getPostgresPool().query(
-          "UPDATE solar_leads SET data = $2::jsonb, updated_at = NOW() WHERE LOWER(id) = LOWER($1)",
-          [id, JSON.stringify(updated)],
-        );
+        await ensureDefaultRules();
+        let query = `
+          SELECT
+            n.id,
+            n.project_id AS "projectId",
+            n.customer_id AS "customerId",
+            COALESCE(l.data->>'name', 'Valued Customer') AS "customerName",
+            n.channel,
+            n.recipient,
+            n.message,
+            n.status,
+            n.stage,
+            n.created_at AS "createdAt",
+            n.read_at AS "readAt"
+          FROM solar_notifications n
+          LEFT JOIN solar_leads l ON LOWER(n.project_id) = LOWER(l.id)
+          WHERE 1=1
+        `;
+        const params: unknown[] = [];
+        if (filters?.projectId) {
+          params.push(filters.projectId.toLowerCase());
+          query += ` AND LOWER(n.project_id) = $${params.length}`;
+        }
+        if (filters?.customerId) {
+          params.push(filters.customerId);
+          query += ` AND n.customer_id = $${params.length}`;
+        }
+        if (filters?.channel && filters.channel !== "ALL") {
+          params.push(filters.channel);
+          query += ` AND n.channel = $${params.length}`;
+        }
+        if (filters?.status && filters.status !== "ALL") {
+          params.push(filters.status);
+          query += ` AND n.status = $${params.length}`;
+        }
+        query += " ORDER BY n.created_at DESC";
+
+        const { rows } = await getPostgresPool().query<MockNotification>(query, params);
+        if (rows && rows.length > 0) return rows;
       } catch (err) {
-        console.warn("Postgres update failed, updated in memory store only:", err instanceof Error ? err.message : err);
+        console.warn("Postgres getNotifications failed, falling back to memory store:", err instanceof Error ? err.message : err);
       }
     }
 
-    return updated;
+    // In-memory fallback
+    const allLeads = getMemoryLeads();
+    let notifications: MockNotification[] = [];
+    for (const lead of allLeads) {
+      if (lead.notifications && lead.notifications.length > 0) {
+        for (const n of lead.notifications) {
+          notifications.push({
+            ...n,
+            projectId: n.projectId || lead.id,
+            customerName: n.customerName || lead.name,
+            customerId: n.customerId || lead.ownerUserId,
+            recipient: n.recipient || lead.phone || "—",
+            createdAt: n.createdAt || n.sentAt || lead.updatedAt,
+          });
+        }
+      }
+    }
+
+    if (filters?.projectId) {
+      notifications = notifications.filter(
+        (n) => n.projectId.toLowerCase() === filters.projectId!.toLowerCase()
+      );
+    }
+    if (filters?.customerId) {
+      notifications = notifications.filter((n) => n.customerId === filters.customerId);
+    }
+    if (filters?.channel && filters.channel !== "ALL") {
+      notifications = notifications.filter((n) => n.channel === filters.channel);
+    }
+    if (filters?.status && filters.status !== "ALL") {
+      notifications = notifications.filter((n) => n.status === filters.status);
+    }
+
+    return notifications.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
 
   static async getSubsidyRules(): Promise<SubsidyRule[]> {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SolarDB } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth-server";
+import { hideLeadScoring } from "@/lib/lead-privacy";
 
 export async function GET(
   req: NextRequest,
@@ -18,7 +19,7 @@ export async function GET(
       return NextResponse.json({ error: "You do not have access to this enquiry." }, { status: 403 });
     }
 
-    return NextResponse.json({ success: true, lead });
+    return NextResponse.json({ success: true, lead: user.role === "HOMEOWNER" ? hideLeadScoring(lead) : lead });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error retrieving lead";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -31,12 +32,36 @@ export async function PATCH(
 ) {
   try {
     const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required to update enquiries." }, { status: 401 });
+    }
+
     const { id } = await params;
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const existing = await SolarDB.getLeadById(id);
     if (!existing) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
-    const isStaff = user && user.role !== "HOMEOWNER";
-    const isOwnerAccepting = user?.role === "HOMEOWNER" && (!existing.ownerUserId || existing.ownerUserId === user.id) && body.status === "QUOTATION_APPROVED";
+
+    const VALID_STAGES = new Set([
+      "LEAD_APPROVED",
+      "SITE_SURVEY",
+      "QUOTATION_APPROVED",
+      "ADVANCE_PAYMENT",
+      "INSTALLATION",
+      "NET_METERING",
+      "SUBSIDY_APPLICATION",
+      "SUBSIDY_CREDITED",
+    ]);
+
+    if (body.status && !VALID_STAGES.has(body.status)) {
+      return NextResponse.json({ error: "Invalid project status stage." }, { status: 400 });
+    }
+
+    const isStaff = user.role !== "HOMEOWNER";
+    const isOwnerAccepting =
+      user.role === "HOMEOWNER" &&
+      (!existing.ownerUserId || existing.ownerUserId === user.id) &&
+      body.status === "QUOTATION_APPROVED";
+
     if (!isStaff && !isOwnerAccepting) {
       return NextResponse.json({ error: "You do not have access to update this enquiry." }, { status: 403 });
     }
@@ -50,11 +75,11 @@ export async function PATCH(
       }
     }
 
-    const updates = isOwnerAccepting && !existing.ownerUserId ? { ...body, ownerUserId: user!.id } : body;
+    const updates = isOwnerAccepting && !existing.ownerUserId ? { ...body, ownerUserId: user.id } : body;
     const updated = await SolarDB.updateLead(id, updates);
     if (!updated) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
 
-    return NextResponse.json({ success: true, lead: updated });
+    return NextResponse.json({ success: true, lead: isStaff ? updated : hideLeadScoring(updated) });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error updating lead";
     return NextResponse.json({ error: message }, { status: 500 });

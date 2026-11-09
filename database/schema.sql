@@ -44,3 +44,39 @@ CREATE TABLE IF NOT EXISTS solar_rules (
   data JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS solar_payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id TEXT NOT NULL REFERENCES solar_leads(id) ON DELETE CASCADE,
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+  payment_type TEXT NOT NULL CHECK (payment_type IN ('Advance', 'Installment', 'Final')),
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('Cash', 'UPI Mock', 'Bank Transfer Mock')),
+  status TEXT NOT NULL CHECK (status IN ('Pending', 'Paid', 'Failed')),
+  transaction_reference TEXT NOT NULL UNIQUE,
+  idempotency_key UUID NOT NULL UNIQUE,
+  payment_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by UUID NOT NULL REFERENCES app_users(id)
+);
+
+CREATE INDEX IF NOT EXISTS solar_payments_project_date_idx
+  ON solar_payments(project_id, payment_date DESC);
+CREATE INDEX IF NOT EXISTS solar_payments_status_idx
+  ON solar_payments(status);
+
+CREATE TABLE IF NOT EXISTS solar_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id TEXT NOT NULL REFERENCES solar_leads(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  channel TEXT NOT NULL DEFAULT 'WhatsApp Mock',
+  recipient TEXT NOT NULL,
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'Sent Mock',
+  stage TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  read_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS solar_notifications_project_id_idx ON solar_notifications(project_id);
+CREATE INDEX IF NOT EXISTS solar_notifications_customer_id_idx ON solar_notifications(customer_id);
+CREATE INDEX IF NOT EXISTS solar_notifications_created_at_idx ON solar_notifications(created_at DESC);

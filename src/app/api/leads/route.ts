@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SolarDB } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth-server";
+import { hideLeadScoring } from "@/lib/lead-privacy";
 
 export async function GET() {
   try {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       billImageBase64: body.billImageBase64,
     });
 
-    return NextResponse.json({ success: true, lead: newLead }, { status: 201 });
+    return NextResponse.json({ success: true, lead: hideLeadScoring(newLead) }, { status: 201 });
   } catch (err: unknown) {
     console.error("Failed to create lead:", err);
     return NextResponse.json({ error: "Failed to create lead. Please try again." }, { status: 500 });

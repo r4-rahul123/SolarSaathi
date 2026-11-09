@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Contrast,
   ShieldCheck,
@@ -17,11 +18,14 @@ import { useLanguage } from "@/context/LanguageContext";
 import { SolarSaathiLogo } from "@/components/SolarSaathiLogo";
 
 export function Navbar() {
+  const pathname = usePathname();
   const { toggleTheme } = useTheme();
   const { user, logout, setIsAuthModalOpen } = useAuth();
   const { lang, setLang, t } = useLanguage();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
+
+  if (pathname?.startsWith("/quote")) return null;
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#06150F]/90 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 transition-colors print:hidden">
@@ -36,12 +40,12 @@ export function Navbar() {
                   Solar<span className="text-[#198754] dark:text-white">Saathi</span>
                 </span>
                 <span className="hidden sm:inline-flex px-2 py-0.5 text-[11px] font-bold bg-[#E7F3EC] dark:bg-emerald-950/80 text-[#123D2B] dark:text-emerald-300 rounded-full border border-emerald-200 dark:border-emerald-800/60">
-                  विदर्भ सोलर
+                  {t("brandRegion")}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 font-medium">
                 <MapPin className="w-3 h-3 text-[#198754]" />
-                <span>Nagpur & Vidarbha Clean Energy</span>
+                <span>{t("navServiceArea")}</span>
               </div>
             </div>
           </Link>
@@ -190,7 +194,7 @@ export function Navbar() {
                 onClick={() => setIsAuthModalOpen(true)}
                 className="px-3.5 py-1.5 rounded-xl bg-[#123D2B] dark:bg-white text-white dark:text-slate-900 font-bold text-xs hover:opacity-90 transition-all cursor-pointer shadow-xs"
               >
-                Sign In
+                  {t("signIn")}
               </button>
             )}
 

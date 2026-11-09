@@ -46,8 +46,8 @@ body {
 
 @media print {
   @page {
-    size: auto;
-    margin: 12mm;
+    size: A4 portrait;
+    margin: 8mm 10mm;
   }
 
   html,
@@ -56,50 +56,117 @@ body {
     height: auto !important;
     background: #fff !important;
     color: #111827 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   body {
     display: block !important;
   }
 
+  /* Completely hide standard website UI */
   header,
   footer,
-  [class~="print:hidden"] {
+  nav,
+  .print\:hidden,
+  [class*="print:hidden"],
+  button {
     display: none !important;
   }
 
-  [data-print-quote],
-  [data-print-quote] * {
+  /* All colors and backgrounds preserved */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     animation: none !important;
     box-shadow: none !important;
     text-shadow: none !important;
   }
 
-  [data-print-quote] {
-    max-width: none !important;
+  /* Dedicated quotation container */
+  #dedicated-solar-quotation {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
     color: #111827 !important;
   }
 
-  [data-print-quote] [class*="dark:bg-"] {
-    background-color: #fff !important;
+  .quotation-document {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
   }
 
-  [data-print-quote] [class*="dark:text-"] {
-    color: #111827 !important;
+  /* Exactly 2 A4 pages */
+  .quotation-page {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  [data-print-quote] [class*="bg-gradient-to-br"] {
-    background: #123d2b !important;
-    color: #fff !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  .quotation-page-1 {
+    padding: 4px 12px !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  [data-print-quote] .text-white {
-    color: #fff !important;
+  .quotation-page-1 .my-4 {
+    margin-top: 8px !important;
+    margin-bottom: 8px !important;
   }
 
-  [data-print-quote] button {
-    display: none !important;
+  .quotation-page-1 .p-5 {
+    padding: 12px !important;
+  }
+
+  .quotation-page-1 th,
+  .quotation-page-1 td {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+  }
+
+  .quotation-page-1 .pb-5 {
+    padding-bottom: 10px !important;
+  }
+
+  .quotation-page-2 {
+    padding: 4px 12px !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .quotation-page-2 .print-compact-section {
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .quotation-page-2 .print-compact-section p {
+    line-height: 1.15 !important;
+  }
+
+  .quotation-page-2 .print-compact-section.rounded-lg {
+    padding: 8px !important;
+  }
+
+  .quotation-page-2 > div:last-child {
+    padding-top: 6px !important;
+  }
+
+  table, tr, td, th {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

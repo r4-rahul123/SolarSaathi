@@ -43,3 +43,8 @@ next-env.d.ts
 
 # local submission zip
 submission.zip
+*.zip
+
+# test outputs
+/test-results/
+/playwright-report/
