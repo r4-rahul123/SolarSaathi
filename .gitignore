@@ -48,3 +48,4 @@ submission.zip
 # test outputs
 /test-results/
 /playwright-report/
+/submission_bundle/
