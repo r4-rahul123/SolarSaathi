@@ -1,5 +1,8 @@
 # SolarSaathi — Fresh Setup and Submission Guide
 
+**Project repository:** [https://github.com/r4-rahul123/SolarSaathi](https://github.com/r4-rahul123/SolarSaathi)  
+**Live application:** No deployed URL was independently verified for this submission.
+
 SolarSaathi is a Next.js 16 application for rooftop-solar estimates, homeowner enquiries and project tracking in Nagpur & Vidarbha. Account signup, login and persistent application data require PostgreSQL.
 
 ## Prerequisites
