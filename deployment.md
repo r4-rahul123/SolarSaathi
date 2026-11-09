@@ -48,6 +48,10 @@ SolarSaathi is a Next.js 16 application for rooftop-solar estimates, homeowner e
 
    Allowed roles are `HOMEOWNER`, `SALES`, `SURVEYOR` and `COORDINATOR`. Use only an account you control; never expose role assignment through a public UI or use this SQL against a shared/production database without authorization. The ZIP contains no generated accounts or database contents.
 
+### Reviewer login
+
+There are **no seeded demo credentials** in the repository. Create a homeowner account from `/signup` using an email you control. For staff-only screens, create an account and assign `SALES` locally using the pgAdmin SQL above. No username or password is hardcoded or included in this submission.
+
 The database setup command applies `database/schema.sql`; it initializes tables and is not a versioned migration framework. This schema includes `solar_payments` for mock payment tracking and `solar_notifications` for the mock notification audit trail. Existing installations should back up the database and rerun `npm run db:setup` to add tables and indexes; the operation is idempotent. Keep backups before applying schema changes to an existing database.
 
 The staff dashboard's **Payments** section records simulated project payments only. Payment method labels such as “UPI Mock” do not initiate a transfer. A printable receipt is issued only for a record marked Paid and is explicitly labelled as not a real transaction.
