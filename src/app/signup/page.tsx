@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -9,12 +9,19 @@ import { SolarSaathiLogo } from "@/components/SolarSaathiLogo";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signup } = useAuth();
+  const { signup, user, isLoading } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const checkedInitialSession = useRef(false);
+
+  useEffect(() => {
+    if (isLoading || checkedInitialSession.current) return;
+    checkedInitialSession.current = true;
+    if (user) router.replace(user.role === "HOMEOWNER" ? "/" : "/admin");
+  }, [isLoading, router, user]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -26,10 +33,27 @@ export default function SignupPage() {
       return;
     }
     const requestedPath = new URLSearchParams(window.location.search).get("next");
-    const safeRequestedPath = requestedPath?.startsWith("/") && !requestedPath.startsWith("//") ? requestedPath : null;
+    const routePath = requestedPath?.split(/[?#]/, 1)[0];
+    const blockedRoutes = ["/login", "/signup", "/forgot-password"];
+    const safeRequestedPath = requestedPath?.startsWith("/")
+      && routePath
+      && !blockedRoutes.includes(routePath)
+      && new URL(requestedPath, window.location.origin).origin === window.location.origin
+      ? requestedPath
+      : null;
     const pendingEstimate = sessionStorage.getItem("solarsaathi-pending-estimate");
     router.push(safeRequestedPath || (pendingEstimate ? "/?resumeEstimate=1#estimate" : "/"));
   };
+
+  if (isLoading || user) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-slate-100 px-4 dark:bg-slate-950">
+        <p role="status" className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+          {isLoading ? "Checking your account…" : "You’re already signed in. Redirecting…"}
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="grid min-h-screen bg-slate-100 p-4 dark:bg-slate-950 lg:grid-cols-2 lg:p-0">

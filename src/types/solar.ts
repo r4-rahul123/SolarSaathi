@@ -11,7 +11,7 @@ export interface ScoreBreakdown {
   consumptionPoints: number;    // max 20
   serviceabilityPoints: number; // max 10
   totalScore: number;           // 0 - 100
-  tier: LeadScoreCategory;      // 70-100 High, 40-69 Medium, 0-39 Low
+  tier: LeadScoreCategory;      // Assumed bands: 70+ High, 40-69 Medium, below 40 Low
   explanation: string;
 }
 
@@ -100,7 +100,7 @@ export interface MockNotification {
 }
 
 export interface Lead {
-  id: string; // e.g. LD-30881 / PROJECT-1024
+  id: string; // Generated PROJECT-<UUID> reference
   ownerUserId?: string;
   name: string;
   phone: string;
@@ -130,6 +130,7 @@ export interface Lead {
   isStuck?: boolean; // True if status unchanged for > 7 days
   createdAt: string;
   updatedAt: string;
+  lastStatusChangedAt?: string;
 }
 
 export interface PricingRule {

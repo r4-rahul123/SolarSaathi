@@ -24,7 +24,7 @@ Repository: isolab (Next.js 16.4.4 App Router)
 
 --------------------------------------------------------------------------------
 [Iteration 4] Staff Operations CRM & Pricing Master
-- Added Stuck Projects Dashboard for projects inactive >7 days (PR-1025, PR-1026).
+- Added Stuck Projects Dashboard for projects with no recorded update for more than 7 days.
 - Added Turnkey Base Installation Pricing table (1kW, 2kW, 3kW) alongside dated subsidy rules.
 - Added automated WhatsApp & SMS audit log stream.
 

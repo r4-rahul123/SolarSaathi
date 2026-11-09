@@ -24,7 +24,7 @@ export function Navbar() {
   const [isLangOpen, setIsLangOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#06150F]/90 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 transition-colors">
+    <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#06150F]/90 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 transition-colors print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Brand */}

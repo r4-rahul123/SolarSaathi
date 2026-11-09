@@ -246,13 +246,13 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
   if (step === 3 && (createdLead || previewLead)) {
     const displayLead = createdLead || previewLead!;
     const breakdown = createdLead?.scoreBreakdown;
-    const isHigh = createdLead?.score === "High" || breakdown?.tier === "High";
+    const isSiteVisit = createdLead?.nextAction === "SITE_VISIT";
 
     return (
       <div className="space-y-6">
         {createdLead && <>
         {/* Status Alert Banner */}
-        {isHigh ? (
+        {isSiteVisit ? (
           <div className="bg-emerald-50 dark:bg-emerald-950/40 border-2 border-[#198754]/40 rounded-3xl p-6 flex flex-col sm:flex-row items-start gap-4 backdrop-blur-sm shadow-md">
             <div className="p-3 bg-[#198754] text-white rounded-2xl shadow-md shrink-0">
               <CheckCircle className="w-7 h-7" />
@@ -319,10 +319,12 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
                     className={`font-black text-xs px-3 py-1 rounded-full uppercase tracking-wider ${
                       breakdown.tier === "High"
                         ? "bg-[#E7F3EC] text-[#123D2B] border border-[#198754]/40"
-                        : "bg-amber-100 text-amber-900 border border-amber-300"
+                        : breakdown.tier === "Medium"
+                          ? "bg-blue-100 text-blue-900 border border-blue-300"
+                          : "bg-amber-100 text-amber-900 border border-amber-300"
                     }`}
                   >
-                    {breakdown.tier === "High" ? "Survey review" : "Phone review"}
+                    {breakdown.tier} score · {createdLead?.nextAction === "SITE_VISIT" ? "Survey review" : "Short call first"}
                   </span>
                 </div>
               </div>
@@ -333,7 +335,7 @@ export function SolarIntakeForm({ onLeadCreated }: SolarIntakeFormProps) {
               <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all duration-1000 ${
-                    breakdown.tier === "High" ? "bg-[#198754]" : "bg-amber-500"
+                    breakdown.tier === "High" ? "bg-[#198754]" : breakdown.tier === "Medium" ? "bg-blue-500" : "bg-amber-500"
                   }`}
                   style={{ width: `${Math.min(breakdown.totalScore, 100)}%` }}
                 />

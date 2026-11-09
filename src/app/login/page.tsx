@@ -13,9 +13,9 @@ function getPostLoginDestination(search: string, role?: string) {
   const routePath = requestedPath?.split(/[?#]/, 1)[0];
   const authRoutes = ["/login", "/signup", "/forgot-password"];
   const safeRequestedPath = requestedPath?.startsWith("/")
-    && !requestedPath.startsWith("//")
     && routePath
     && !authRoutes.includes(routePath)
+    && new URL(requestedPath, window.location.origin).origin === window.location.origin
     ? requestedPath
     : null;
   return safeRequestedPath || (role === "HOMEOWNER" ? "/" : "/admin");

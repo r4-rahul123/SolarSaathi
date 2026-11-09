@@ -2,29 +2,18 @@
 
 This project uses PostgreSQL for user accounts, sessions, enquiries, and pricing rules.
 
-## Start the local database
+## Connect an existing PostgreSQL installation
 
-1. Start Docker Desktop.
-2. Copy `.env.example` to `.env.local`.
-3. Run `docker compose up -d postgres`.
-4. Run `npm run db:setup` to create the tables.
-5. Run `npm run db:seed-demo` to add the local demo accounts.
-6. Run `npm run dev`.
+1. In pgAdmin, create a database named `solarsaathi` (or choose an existing database).
+2. Copy `.env.example` to `.env.local` and set `DATABASE_URL` to match your PostgreSQL host, port, database, username and password. Keep this file private and out of Git.
+3. Run `npm run db:setup` to create the application tables.
+4. Run `npm run dev`.
 
-The Compose database is bound to `127.0.0.1:55432` to avoid colliding with a local PostgreSQL install. It uses a development-only password. Change it before using any shared or deployed environment, and update `DATABASE_URL` to match. Do not commit `.env.local`.
+If you prefer Docker, `docker compose up -d postgres` starts a separate development database on `127.0.0.1:55432`. Its password is for local use only; update `DATABASE_URL` to match and never use it in a shared or deployed environment.
 
-## Local demo accounts
+## Accounts and roles
 
-| Workspace | Email | Password |
-| --- | --- | --- |
-| Customer | `customer@solarsaathi.demo` | `customer123` |
-| Sales | `sales@solarsaathi.demo` | `sales123` |
-| Surveyor | `surveyor@solarsaathi.demo` | `survey123` |
-| Admin | `admin@solarsaathi.demo` | `admin123` |
-
-The seed command refuses to run with `NODE_ENV=production`. These credentials are only for a local demo. The database stores Argon2id password hashes, not these plaintext passwords. Public signup always creates a `HOMEOWNER`; staff roles are assigned through the local demo seed or by an administrator.
-
-The current Compose password is intentionally simple for local development. Use a strong secret manager value and a managed database before deployment.
+Public signup creates homeowner accounts. Staff roles must be provisioned by an authorized operator. `npm run db:seed-demo` is an optional local development helper for testing staff screens; it refuses to run in production and should not be used with a shared database.
 
 ## Password reset email
 

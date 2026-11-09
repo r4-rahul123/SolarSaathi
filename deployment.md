@@ -10,7 +10,7 @@
 ## 1. How to Run Locally (Step-by-Step)
 
 ### Prerequisites:
-- **Node.js**: v18.18+ or v20+ or v22+
+- **Node.js**: v20.9+ (recommended: current Node.js LTS)
 - **npm**: v9+ or v10+
 - **Git**
 
@@ -26,14 +26,20 @@ npm install
 ```
 
 ### Step 3: Configure Environment Variables
-Create a file named `.env.local` in the project root:
+Copy `.env.example` to `.env.local`:
+```bash
+cp .env.example .env.local
+```
+
+SolarSaathi features dual-mode architecture:
+- **Zero-Setup In-Memory Mode**: If `DATABASE_URL` is omitted, the platform runs instantly using pre-seeded in-memory scenarios for rapid evaluation.
+- **PostgreSQL Mode**: Follow [POSTGRES.md](./POSTGRES.md) to connect an existing PostgreSQL instance or run `docker compose up -d postgres`, then run `npm run db:setup` and `npm run db:seed-demo`.
+
 ```env
-# Optional: Google Gemini API Key for Live Multimodal Bill OCR
-# If omitted or left empty, SolarSaathi automatically operates with a high-fidelity
-# built-in MSEDCL parser with confidence scores so evaluators can test instantly!
+# Optional: Google Gemini API key for live multimodal bill OCR extraction.
+# If omitted or left empty, SolarSaathi operates smoothly with manual input and high-fidelity presets!
 GEMINI_API_KEY=
 ```
-*(Security Note: As per assignment guidelines, no real API keys or credentials are committed into this repository).*
 
 ### Step 4: Run Automated Tests
 Verify all core central subsidy formulas, 1,400 units/kW benchmark sizing, payback, and 100-point transparent lead scoring:
@@ -51,7 +57,7 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ## 2. Reviewer Demo Login Credentials (RBAC)
 
-The local demo database has four seeded accounts. Sign in by entering the email and password manually:
+The local demo database includes four pre-seeded role accounts:
 
 | Role | Demo Email | Password | Access & Responsibilities |
 | :--- | :--- | :--- | :--- |
@@ -60,13 +66,11 @@ The local demo database has four seeded accounts. Sign in by entering the email 
 | **🛠️ Site Surveyor** | `surveyor@solarsaathi.demo` | `survey123` | Scheduled rooftop site visits, shadow-free area checks, and structural feasibility approvals. |
 | **📋 Project Coordinator (Admin)** | `admin@solarsaathi.demo` | `admin123` | Full access: Stuck projects alert (>7 days), DISCOM net-metering status, milestone progression, and **Dated Subsidy Rule & Base Installation Pricing Master Editor**. |
 
-Public signup creates homeowner accounts. Staff roles are assigned to the seeded local demo accounts; the UI does not switch roles after sign-in.
-
 ---
 
 ## 3. Pre-Seeded Evaluation Scenarios
 
-For rapid 2-minute evaluation, pre-seeded leads and projects are included in memory:
+For rapid 2-minute evaluation, 5 pre-seeded leads and projects are included in memory:
 
 1. **Prashant Wankhede (`LD-30881`)**:
    - High Priority Owner: 340 units/month, 650 sq. ft. flat concrete roof.
@@ -81,18 +85,19 @@ For rapid 2-minute evaluation, pre-seeded leads and projects are included in mem
    - Diverted to Tele-Advisory desk to save survey costs.
    - Public Tracker: `/track/LD-30915`.
 4. **Dr. Rajesh Deshmukh (`PR-1025`)**:
-   - **Stuck Project Alert**: Delayed 10 days at MSEDCL net-metering stage (>7 days threshold).
-   - Flagged in the Staff CRM Stuck Projects tab for staff review and status update.
+   - **Stuck Project Alert**: Delayed at MSEDCL net-metering stage (>7 days threshold).
+   - Flagged in Staff CRM Stuck Projects tab with 1-click stage resolution.
    - Public Tracker: `/track/PR-1025`.
 5. **Sunita Patil (`PR-1026`)**:
-   - **Stuck Project Alert**: Delayed 15 days awaiting DISCOM inspection.
+   - **Stuck Project Alert**: Delayed at National Portal subsidy release.
+   - Flagged in Staff CRM Stuck Projects tab with 1-click stage resolution.
    - Public Tracker: `/track/PR-1026`.
 
 ---
 
 ## 4. Production Deployment (Vercel)
 
-The application is built on **Next.js 16 App Router** with full React 19 support and deploys to **Vercel** with zero configuration.
+The application uses **Next.js 16 App Router** and React 19.
 
 ### Steps to Deploy to Vercel:
 1. Push this repository to your public GitHub account:
@@ -104,8 +109,10 @@ The application is built on **Next.js 16 App Router** with full React 19 support
    git push -u origin main
    ```
 2. Go to [https://vercel.com](https://vercel.com) and import the repository.
-3. In **Environment Variables**, optionally add:
-   - `GEMINI_API_KEY`: *(Your Google AI Studio API key)*
+3. In **Environment Variables**, optionally set:
+   - `DATABASE_URL`: Hosted PostgreSQL connection string (Supabase / Neon / AWS RDS).
+   - `PASSWORD_RESET_SECRET`: Random secret of at least 32 characters.
+   - `GEMINI_API_KEY`: Google Gemini API key for OCR extraction.
 4. Click **Deploy**. Vercel will build and deploy the production site with an instant live `.vercel.app` URL.
 
 ---
@@ -114,4 +121,7 @@ The application is built on **Next.js 16 App Router** with full React 19 support
 
 | Variable Name | Required? | Purpose |
 | :--- | :---: | :--- |
-| `GEMINI_API_KEY` | Optional | Powers live Google Gemini 2.5 Flash Vision OCR on electricity bill images. If omitted, the built-in parser seamlessly handles evaluation with confidence scores and zero errors. |
+| `DATABASE_URL` | Optional | PostgreSQL connection string. If omitted, SolarSaathi operates in zero-setup in-memory mode. |
+| `PASSWORD_RESET_SECRET` | Production | Random secret of at least 32 characters used to sign password reset tokens. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Optional | SMTP settings for email password-reset OTP dispatch. |
+| `GEMINI_API_KEY` | Optional | Powers live Google Gemini 2.5 Flash Vision OCR on electricity bill images. If omitted, users can enter bill values manually. |

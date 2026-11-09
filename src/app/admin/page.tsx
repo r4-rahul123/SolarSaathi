@@ -30,6 +30,7 @@ export default function AdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   // Editable subsidy rule form state
   const [ruleName, setRuleName] = useState("");
@@ -51,18 +52,20 @@ export default function AdminDashboardPage() {
 
   const fetchLeads = async () => {
     try {
-      const res = await fetch("/api/leads");
+      const res = await fetch("/api/leads", { cache: "no-store" });
       const data = await res.json();
-      if (data.leads) setLeads(data.leads);
-    } catch (e) {
-      console.error(e);
+      if (!res.ok || !Array.isArray(data.leads)) throw new Error(data.error || "Could not load enquiries.");
+      setLeads(data.leads);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load enquiries.");
     }
   };
 
   const fetchRules = async () => {
     try {
-      const res = await fetch("/api/rules");
+      const res = await fetch("/api/rules", { cache: "no-store" });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load pricing and subsidy settings.");
       if (data.rules && data.rules.length > 0) {
         setRules(data.rules);
         const r = data.rules[0];
@@ -81,9 +84,15 @@ export default function AdminDashboardPage() {
         });
         setEditingPricing(priceMap);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load pricing and subsidy settings.");
     }
+  };
+
+  const retryDashboardLoad = () => {
+    setLoadError("");
+    setIsLoading(true);
+    void Promise.all([fetchLeads(), fetchRules()]).finally(() => setIsLoading(false));
   };
 
   useEffect(() => {
@@ -189,7 +198,7 @@ export default function AdminDashboardPage() {
   };
 
   const filteredLeads = leads.filter((l) => {
-    const matchesFilter = filterScore === "ALL" || l.score === filterScore;
+    const matchesFilter = filterScore === "ALL" || (l.scoreBreakdown?.tier || l.score) === filterScore;
     const matchesSearch =
       l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       l.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -201,8 +210,9 @@ export default function AdminDashboardPage() {
 
   // Metrics
   const totalLeads = leads.length;
-  const highLeads = leads.filter((l) => l.score === "High").length;
-  const lowLeads = leads.filter((l) => l.score === "Low").length;
+  const highLeads = leads.filter((l) => (l.scoreBreakdown?.tier || l.score) === "High").length;
+  const mediumLeads = leads.filter((l) => (l.scoreBreakdown?.tier || l.score) === "Medium").length;
+  const lowLeads = leads.filter((l) => (l.scoreBreakdown?.tier || l.score) === "Low").length;
   const savedSurveyCost = lowLeads * 2500;
 
   const currentRole = user?.role;
@@ -292,7 +302,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* METRIC CARDS STRIP */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
           <span className="text-xs text-slate-500 font-medium">Total Received Leads</span>
           <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white font-mono">
@@ -307,6 +317,14 @@ export default function AdminDashboardPage() {
             {highLeads}
           </div>
           <span className="text-xs text-slate-400 font-medium">Suggested survey review</span>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
+          <span className="text-xs text-slate-500 font-medium">Review fit · standard follow-up</span>
+          <div className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400 font-mono">
+            {mediumLeads}
+          </div>
+          <span className="text-xs text-slate-400 font-medium">Needs team review</span>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
@@ -325,6 +343,15 @@ export default function AdminDashboardPage() {
           <span className="text-xs text-slate-400 font-medium">Low-score leads × ₹2,500 estimate</span>
         </div>
       </div>
+
+      {loadError && (
+        <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200 sm:flex-row sm:items-center sm:justify-between">
+          <p>{loadError}</p>
+          <button type="button" onClick={retryDashboardLoad} className="shrink-0 rounded-xl border border-red-300 px-4 py-2 text-xs font-bold transition hover:bg-red-100 dark:border-red-800 dark:hover:bg-red-950">
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* TAB 1: LEADS & PIPELINE TABLE */}
       {activeTab === "leads" && (
@@ -351,6 +378,7 @@ export default function AdminDashboardPage() {
               >
                 <option value="ALL">All Scores</option>
                 <option value="High">High (Immediate Survey)</option>
+                <option value="Medium">Medium (Review)</option>
                 <option value="Low">Low (Phone Desk)</option>
               </select>
             </div>
@@ -370,8 +398,26 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredLeads.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center">
+                      <p className="font-semibold text-slate-700 dark:text-slate-200">
+                        {totalLeads === 0 ? "No enquiries yet" : "No enquiries match your search"}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {totalLeads === 0 ? "New homeowner enquiries will appear here." : "Try a different name, reference or phone number."}
+                      </p>
+                    </td>
+                  </tr>
+                )}
                 {filteredLeads.map((ld) => {
-                  const isHigh = ld.score === "High" || ld.scoreBreakdown?.tier === "High";
+                  const scoreTier = ld.scoreBreakdown?.tier || ld.score;
+                  const scoreStyle = scoreTier === "High"
+                    ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border-emerald-300"
+                    : scoreTier === "Medium"
+                      ? "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border-blue-300"
+                      : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border-amber-300";
+                  const scoreLabel = `${scoreTier || "Unscored"} · ${ld.nextAction === "SITE_VISIT" ? "Survey review" : "Short call"}`;
                   return (
                     <tr key={ld.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="py-3.5 px-4">
@@ -406,13 +452,9 @@ export default function AdminDashboardPage() {
 
                       <td className="py-3.5 px-4">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black ${
-                            isHigh
-                              ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300"
-                              : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300"
-                          }`}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-black ${scoreStyle}`}
                         >
-                          {isHigh ? "★ High Fit" : "Tele-Consult"} ({ld.scoreBreakdown?.totalScore || (isHigh ? 100 : 60)}/100)
+                          {scoreLabel} ({ld.scoreBreakdown?.totalScore ?? "—"}/100)
                         </span>
                         <div className="text-[10px] text-slate-400 mt-1 truncate max-w-[150px]">
                           {ld.scoreBreakdown?.explanation || ld.scoreReason}
@@ -474,11 +516,17 @@ export default function AdminDashboardPage() {
               </h3>
             </div>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 font-medium">
-              Projects with zero milestone updates for over 7 business days are automatically flagged here for DISCOM follow-up and executive intervention.
+              Projects without a status change for 7 full days are flagged here for follow-up.
             </p>
           </div>
 
           <div className="space-y-4">
+            {stuckLeads.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/60 px-5 py-10 text-center dark:border-emerald-900 dark:bg-emerald-950/20">
+                <p className="font-semibold text-slate-800 dark:text-slate-100">No projects need escalation</p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Projects with no status change for 7 full days will appear here.</p>
+              </div>
+            )}
             {stuckLeads.map((stk) => (
               <div
                 key={stk.id}

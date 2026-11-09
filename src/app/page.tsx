@@ -24,8 +24,8 @@ export default function HomePage() {
   const { t } = useLanguage();
 
   return (
-    <main className="pb-20">
-      <section className="relative isolate overflow-hidden bg-[#f2f6f2] dark:bg-[#091710]">
+    <main className="pb-20 print:pb-0">
+      <section className="relative isolate overflow-hidden bg-[#f2f6f2] dark:bg-[#091710] print:hidden">
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[1fr_0.9fr] lg:px-8 lg:py-20">
           <div className="relative z-10 max-w-2xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-900/10 bg-white/80 px-3 py-1.5 text-xs font-semibold text-[#315d47] shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-emerald-200">
@@ -68,7 +68,7 @@ export default function HomePage() {
         <SolarIntakeForm />
       </section>
 
-      <section id="how-it-works" className="mx-auto max-w-5xl scroll-mt-28 px-4 pt-14 sm:px-6 lg:px-8">
+      <section id="how-it-works" className="mx-auto max-w-5xl scroll-mt-28 px-4 pt-14 sm:px-6 lg:px-8 print:hidden">
         <div className="mb-6 max-w-xl">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#198754]">{t("howItWorksEyebrow")}</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{t("howItWorksTitle")}</h2>

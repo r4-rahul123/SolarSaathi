@@ -421,6 +421,18 @@ const INITIAL_LEADS: Lead[] = [
   },
 ];
 
+function withCurrentLeadAge(lead: Lead): Lead {
+  const updatedAt = Date.parse(lead.updatedAt);
+  const lastUpdatedDaysAgo = Number.isFinite(updatedAt)
+    ? Math.max(0, Math.floor((Date.now() - updatedAt) / 86_400_000))
+    : lead.lastUpdatedDaysAgo || 0;
+  return {
+    ...lead,
+    lastUpdatedDaysAgo,
+    isStuck: lead.status !== "SUBSIDY_CREDITED" && lastUpdatedDaysAgo > 7,
+  };
+}
+
 function getMemoryLeads(): Lead[] {
   if (!globalThis.__solarLeadsStore) {
     globalThis.__solarLeadsStore = JSON.parse(JSON.stringify(INITIAL_LEADS));
@@ -486,13 +498,13 @@ export class SolarDB {
         await ensureDefaultRules();
         const { rows } = await getPostgresPool().query<{ data: Lead }>("SELECT data FROM solar_leads ORDER BY created_at DESC");
         if (rows && rows.length > 0) {
-          return rows.map((row) => row.data);
+          return rows.map((row) => withCurrentLeadAge(row.data));
         }
       } catch (err) {
         console.warn("Postgres getLeads failed, falling back to memory store:", err instanceof Error ? err.message : err);
       }
     }
-    return getMemoryLeads();
+    return getMemoryLeads().map(withCurrentLeadAge);
   }
 
   static async getLeadsByOwner(ownerUserId: string): Promise<Lead[]> {
@@ -502,12 +514,12 @@ export class SolarDB {
           "SELECT data FROM solar_leads WHERE data->>'ownerUserId' = $1 ORDER BY created_at DESC",
           [ownerUserId],
         );
-        return rows.map((row) => row.data);
+        return rows.map((row) => withCurrentLeadAge(row.data));
       } catch (err) {
         console.warn("Postgres getLeadsByOwner failed, falling back to memory store:", err instanceof Error ? err.message : err);
       }
     }
-    return getMemoryLeads().filter((lead) => lead.ownerUserId === ownerUserId);
+    return getMemoryLeads().filter((lead) => lead.ownerUserId === ownerUserId).map(withCurrentLeadAge);
   }
 
   static async getLeadById(id: string): Promise<Lead | undefined> {
@@ -515,12 +527,13 @@ export class SolarDB {
       try {
         await ensureDefaultRules();
         const { rows } = await getPostgresPool().query<{ data: Lead }>("SELECT data FROM solar_leads WHERE LOWER(id) = LOWER($1)", [id]);
-        if (rows[0]?.data) return rows[0].data;
+        if (rows[0]?.data) return withCurrentLeadAge(rows[0].data);
       } catch (err) {
         console.warn("Postgres getLeadById failed, falling back to memory store:", err instanceof Error ? err.message : err);
       }
     }
-    return getMemoryLeads().find((lead) => lead.id.toLowerCase() === id.toLowerCase());
+    const lead = getMemoryLeads().find((lead) => lead.id.toLowerCase() === id.toLowerCase());
+    return lead ? withCurrentLeadAge(lead) : undefined;
   }
 
   static async createLead(

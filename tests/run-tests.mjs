@@ -49,19 +49,23 @@ describe("Solar Financial & Subsidy Calculation Engine", () => {
   });
 
   test("Lead qualification engine saves ₹2,500 survey costs on Tenants & Small Bills", () => {
-    // Case 1: Tenant -> Low tier, replaced with short call
+    // Tenant score stays point-based; ownership verification independently routes to a short call.
     const tenantResult = calculateLeadScore("Tenant", 1900, 210, 400, "440025");
-    assert.strictEqual(tenantResult.breakdown.tier, "Low");
+    assert.strictEqual(tenantResult.breakdown.tier, "Medium");
     assert.strictEqual(tenantResult.nextAction, "SHORT_CALL");
 
-    // Case 2: Small bill (< ₹800) -> Low tier, short call
+    // Small-bill routing is independent of the points-based tier.
     const smallBillResult = calculateLeadScore("Owner", 650, 85, 300, "440012");
-    assert.strictEqual(smallBillResult.breakdown.tier, "Low");
+    assert.strictEqual(smallBillResult.breakdown.tier, "Medium");
     assert.strictEqual(smallBillResult.nextAction, "SHORT_CALL");
 
     // Case 3: High value owner (> ₹2,500) -> High tier, physical site visit
     const highResult = calculateLeadScore("Owner", 3200, 340, 650, "440015");
     assert.strictEqual(highResult.breakdown.tier, "High");
     assert.strictEqual(highResult.nextAction, "SITE_VISIT");
+
+    // Capacity rounds up to avoid silently recommending less than the benchmark requires.
+    assert.strictEqual(recommendSystemSize(280), 3);
+    assert.strictEqual(recommendSystemSize(400), 3); // Above the displayed 3 kW options; quote warns for review.
   });
 });

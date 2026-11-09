@@ -28,7 +28,7 @@
 
 ### Phase 4: Staff Operations CRM & Pricing Master
 - [x] Task 4.1: Build lead pipeline queue with filter by score tier and search.
-- [x] Task 4.2: Build Stuck Projects Dashboard flagging >7 days inactivity (`PR-1025`, `PR-1026`).
+- [x] Task 4.2: Build the Stuck Projects Dashboard to flag records with no update for more than 7 days.
 - [x] Task 4.3: Implement dated subsidy rule editor and turnkey installation base pricing table.
 - [x] Task 4.4: Implement mock WhatsApp & SMS notification dispatch log.
 

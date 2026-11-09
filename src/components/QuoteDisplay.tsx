@@ -38,6 +38,8 @@ export function QuoteDisplay({ lead, isPreview = false, onSaveEstimate, isSaving
   const [actionError, setActionError] = useState("");
 
   const quote = lead.quote || calculateSolarQuote(lead.id, lead.recommendedKw, DEFAULT_SUBSIDY_RULE);
+  const monthlyGenerationBenchmark = quote.ruleSnapshot.generationFactor / 12;
+  const capacityReviewNeeded = lead.avgUnitsPerMonth > monthlyGenerationBenchmark * 3;
 
   const handleCopyLink = async () => {
     const url = `${window.location.origin}/track/${lead.id}`;
@@ -82,9 +84,12 @@ export function QuoteDisplay({ lead, isPreview = false, onSaveEstimate, isSaving
   };
 
   const activeOption = quote.options.find((o) => o.systemSizeKw === selectedKw) || quote.options[2];
+  const selectedUsageCoverage = lead.avgUnitsPerMonth > 0
+    ? Math.round(activeOption.annualGenerationUnits / (lead.avgUnitsPerMonth * 12) * 100)
+    : null;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div data-print-quote className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Top Hero Story Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#123D2B] via-[#0E2F21] to-[#0A2218] text-white p-6 sm:p-10 shadow-xl border border-emerald-900/60">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
@@ -251,7 +256,7 @@ export function QuoteDisplay({ lead, isPreview = false, onSaveEstimate, isSaving
                     </div>
 
                     <div className="flex justify-between pt-2 border-t border-slate-100 dark:border-slate-800 font-bold text-sm">
-                      <span className="text-slate-900 dark:text-white">Net Payable:</span>
+                      <span className="text-slate-900 dark:text-white">Estimated cost after subsidy:</span>
                       <span className="font-mono text-[#123D2B] dark:text-emerald-300">
                         {formatCurrency(opt.netCost)}
                       </span>
@@ -297,6 +302,16 @@ export function QuoteDisplay({ lead, isPreview = false, onSaveEstimate, isSaving
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm dark:border-slate-800 dark:bg-slate-900">
         <h3 className="font-semibold text-slate-900 dark:text-white">How this estimate is calculated</h3>
+        {capacityReviewNeeded && (
+          <p className="mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            Your recorded use is above the 3 kW options shown. This estimate may not cover your full consumption; ask the team to review roof area, sanctioned load and a larger system.
+          </p>
+        )}
+        {selectedUsageCoverage !== null && (
+          <p className="mt-2 leading-6 text-slate-600 dark:text-slate-400">
+            The selected {selectedKw} kW option&apos;s benchmark generation is about {selectedUsageCoverage}% of the units you entered. Actual generation and bill offset depend on site and net-metering conditions.
+          </p>
+        )}
         <p className="mt-2 leading-6 text-slate-600 dark:text-slate-400">
           Generation uses {quote.ruleSnapshot.generationFactor.toLocaleString()} units per kW per year. Savings and payback use an assumed tariff of {formatCurrency(quote.ruleSnapshot.tariffAssumption)} per unit; actual savings depend on usage, export credits, site conditions and the applicable tariff.
         </p>

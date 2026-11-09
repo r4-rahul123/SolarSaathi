@@ -127,7 +127,7 @@ Rather than a black-box machine learning model, SolarSaathi implements a transpa
 At every stage transition, an automated notification is created and displayed in the tracking stream with timestamp and delivery status (`DELIVERED`, `READ`).
 
 ### Stuck Projects Escalation (>7 Days Inactivity):
-If a project remains in any stage without progress for more than 7 days (e.g. `PR-1025` stuck 10 days at Net Metering, `PR-1026` stuck 15 days), it is automatically:
+If a project remains in any stage without a recorded update for more than 7 days, it is automatically:
 - Flagged in the customer tracker with an Inactive Project Alert.
 - Prominently surfaced in the Staff CRM **Stuck Projects** tab with customer contact and separate stage update actions.
 

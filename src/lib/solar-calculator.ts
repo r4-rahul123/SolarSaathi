@@ -121,8 +121,8 @@ export function recommendSystemSize(avgUnitsPerMonth: number, rule: SubsidyRule 
   if (!avgUnitsPerMonth || avgUnitsPerMonth <= 0) return 1;
   const annualUnits = avgUnitsPerMonth * 12;
   const rawSize = annualUnits / rule.generationPerKwPerYear;
-  const rounded = Math.round(rawSize);
-  return Math.max(1, Math.min(rounded, 3)); // 1kW to 3kW residential PM Surya Ghar
+  const sizedUp = Math.ceil(rawSize);
+  return Math.max(1, Math.min(sizedUp, 3)); // Quote options are limited to 1–3 kW; larger needs a review.
 }
 
 /**
@@ -161,27 +161,17 @@ export function calculateLeadScore(
 
   const totalScore = ownershipPoints + billPoints + roofAreaPoints + consumptionPoints + serviceabilityPoints;
 
-  let tier: "High" | "Medium" | "Low" = "Medium";
-  let explanation = "";
-  let nextAction: NextAction = "SITE_VISIT";
-
-  if (occupancy === "Tenant") {
-    tier = "Low";
-    nextAction = "SHORT_CALL";
-    explanation = "A tenant enquiry is sent for a short call to confirm the property owner's interest.";
-  } else if (monthlyBill < 800 || avgUnitsPerMonth < 100) {
-    tier = "Low";
-    nextAction = "SHORT_CALL";
-    explanation = "Lower electricity use is better reviewed on a call first. This score does not reject the enquiry.";
-  } else if (totalScore >= 70) {
-    tier = "High";
-    nextAction = "SITE_VISIT";
-    explanation = `Score ${totalScore}/100 based on ownership, bill, roof area, electricity use and PIN code. Suggested next step: site survey review.`;
-  } else {
-    tier = "Medium";
-    nextAction = "SITE_VISIT";
-    explanation = `Score ${totalScore}/100 based on the details provided. Suggested next step: review the enquiry before arranging a survey.`;
-  }
+  // These score bands are product assumptions, not thresholds supplied by the client.
+  const tier: "High" | "Medium" | "Low" = totalScore >= 70 ? "High" : totalScore >= 40 ? "Medium" : "Low";
+  const needsShortCall = occupancy === "Tenant" || monthlyBill < 800 || avgUnitsPerMonth < 100 || tier !== "High";
+  const nextAction: NextAction = needsShortCall ? "SHORT_CALL" : "SITE_VISIT";
+  const explanation = occupancy === "Tenant"
+    ? `Score ${totalScore}/100 (${tier}). Start with a short call to confirm the account holder's and property owner's permission.`
+    : monthlyBill < 800 || avgUnitsPerMonth < 100
+      ? `Score ${totalScore}/100 (${tier}). Start with a short call to understand usage and interest; this does not reject the enquiry.`
+      : nextAction === "SITE_VISIT"
+        ? `Score ${totalScore}/100 (High). Suggested next step: site survey review.`
+        : `Score ${totalScore}/100 (${tier}). Suggested next step: a short sales review before arranging a survey.`;
 
   return {
     breakdown: {

@@ -21,7 +21,7 @@ export function SiteFooter() {
       ? "/admin"
       : "/login?next=%2Ftrack";
   return (
-    <footer className="mt-auto border-t border-emerald-900/60 bg-[#0b2419] text-white dark:bg-[#06150f]">
+    <footer className="mt-auto border-t border-emerald-900/60 bg-[#0b2419] text-white dark:bg-[#06150f] print:hidden">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1.1fr] lg:gap-12">
           <div className="max-w-sm">
